@@ -88,7 +88,7 @@ export const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-zinc-100 flex flex-col justify-between max-w-md mx-auto relative shadow-2xl border-x border-zinc-900/80">
+    <div className="min-h-screen bg-[#05130d] text-zinc-100 flex flex-col justify-between max-w-md mx-auto relative shadow-2xl border-x border-emerald-950/60">
       {/* Top App Header */}
       <Header />
 

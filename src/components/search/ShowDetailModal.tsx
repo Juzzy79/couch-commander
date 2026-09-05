@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Star, Plus, Check, Play, Tv } from 'lucide-react';
 import { TMDBShow, TMDBSeasonDetail } from '../../types/tmdb';
 import { getTMDBImageUrl } from '../../lib/utils';
-import { fetchSeasonDetails } from '../../lib/tmdb';
+import { fetchSeasonDetails, fetchShowDetails } from '../../lib/tmdb';
 import { useTrackerStore } from '../../store/useTrackerStore';
 import { useCheckInStore } from '../../store/useCheckInStore';
 import { ShowLeaderboard } from '../leaderboard/ShowLeaderboard';
@@ -14,10 +14,21 @@ interface ShowDetailModalProps {
   onClose: () => void;
 }
 
-export const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show, onClose }) => {
+export const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show: initialShow, onClose }) => {
+  const [show, setShow] = useState<TMDBShow | null>(initialShow);
   const [selectedSeasonNumber, setSelectedSeasonNumber] = useState<number>(1);
   const [seasonDetail, setSeasonDetail] = useState<TMDBSeasonDetail | null>(null);
   const [isLoadingSeason, setIsLoadingSeason] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!initialShow) return;
+    setShow(initialShow);
+    fetchShowDetails(initialShow.id).then((full) => {
+      if (full) {
+        setShow(full);
+      }
+    });
+  }, [initialShow]);
 
   const trackedShow = useTrackerStore((state) =>
     show ? state.getTrackedShow(show.id) : undefined
