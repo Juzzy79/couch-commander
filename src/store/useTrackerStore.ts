@@ -72,6 +72,10 @@ export const useTrackerStore = create<TrackerState>((set, get) => {
         targetShow = {
           ...existing,
           ...showData,
+          status: showData.status || existing.status || 'watching',
+          currentSeason: showData.currentSeason !== undefined ? showData.currentSeason : existing.currentSeason,
+          currentEpisode: showData.currentEpisode !== undefined ? showData.currentEpisode : existing.currentEpisode,
+          totalEpisodesWatched: Math.max(existing.totalEpisodesWatched || 0, showData.totalEpisodesWatched || 1),
           lastWatchedAt: showData.lastWatchedAt || existing.lastWatchedAt || Date.now(),
         };
         updated = [...shows];
@@ -84,9 +88,9 @@ export const useTrackerStore = create<TrackerState>((set, get) => {
           backdropPath: showData.backdropPath,
           status: showData.status || 'watching',
           currentSeason: showData.currentSeason || 1,
-          currentEpisode: showData.currentEpisode || 0,
-          totalEpisodesWatched: showData.totalEpisodesWatched || 0,
-          totalEpisodesInShow: showData.totalEpisodesInShow,
+          currentEpisode: showData.currentEpisode !== undefined ? showData.currentEpisode : 1,
+          totalEpisodesWatched: showData.totalEpisodesWatched || 1,
+          totalEpisodesInShow: showData.totalEpisodesInShow || 10,
           lastWatchedAt: Date.now(),
           nextEpisodeToWatch: showData.nextEpisodeToWatch,
         };
