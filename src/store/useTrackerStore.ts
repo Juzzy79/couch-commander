@@ -101,25 +101,47 @@ export const useTrackerStore = create<TrackerState>((set, get) => {
     markEpisodeWatched: (showId, seasonNumber, episodeNumber, nextEpisode) => {
       const shows = get().trackedShows;
       const index = shows.findIndex((s) => s.tmdbShowId === showId);
-      if (index < 0) return;
+      
+      let updatedShow: TrackedShow;
+      let updated: TrackedShow[];
 
-      const existing = shows[index];
-      const updatedShow: TrackedShow = {
-        ...existing,
-        status: 'watching',
-        currentSeason: seasonNumber,
-        currentEpisode: episodeNumber,
-        totalEpisodesWatched: (existing.totalEpisodesWatched || 0) + 1,
-        lastWatchedAt: Date.now(),
-        nextEpisodeToWatch: nextEpisode || {
-          seasonNumber: seasonNumber,
-          episodeNumber: episodeNumber + 1,
-          title: `Episode ${episodeNumber + 1}`,
-        },
-      };
+      if (index >= 0) {
+        const existing = shows[index];
+        updatedShow = {
+          ...existing,
+          status: 'watching',
+          currentSeason: seasonNumber,
+          currentEpisode: episodeNumber,
+          totalEpisodesWatched: (existing.totalEpisodesWatched || 0) + 1,
+          lastWatchedAt: Date.now(),
+          nextEpisodeToWatch: nextEpisode || {
+            seasonNumber: seasonNumber,
+            episodeNumber: episodeNumber + 1,
+            title: `Episode ${episodeNumber + 1}`,
+          },
+        };
+        updated = [...shows];
+        updated[index] = updatedShow;
+      } else {
+        updatedShow = {
+          tmdbShowId: showId,
+          showTitle: `Show #${showId}`,
+          posterPath: '',
+          status: 'watching',
+          currentSeason: seasonNumber,
+          currentEpisode: episodeNumber,
+          totalEpisodesWatched: 1,
+          totalEpisodesInShow: 10,
+          lastWatchedAt: Date.now(),
+          nextEpisodeToWatch: nextEpisode || {
+            seasonNumber: seasonNumber,
+            episodeNumber: episodeNumber + 1,
+            title: `Episode ${episodeNumber + 1}`,
+          },
+        };
+        updated = [updatedShow, ...shows];
+      }
 
-      const updated = [...shows];
-      updated[index] = updatedShow;
       set({ trackedShows: updated });
       persist(updated);
       syncShowToFirestore(updatedShow);

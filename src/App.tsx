@@ -10,7 +10,6 @@ import { ActivityFeed } from './components/activity/ActivityFeed';
 import { ProfileView } from './components/profile/ProfileView';
 import { CheckInBottomSheet } from './components/checkin/CheckInBottomSheet';
 import { CheckInSelectorModal } from './components/checkin/CheckInSelectorModal';
-import { CheckInFAB } from './components/common/CheckInFAB';
 import { BadgeUnlockModal } from './components/badges/BadgeUnlockModal';
 import { SettingsModal } from './components/settings/SettingsModal';
 import { ShowDetailModal } from './components/search/ShowDetailModal';
@@ -48,19 +47,69 @@ export const AppContent: React.FC = () => {
     return () => unsubAuth();
   }, [initializeAuthListener]);
 
-  // Real-time Firestore social feed subscription
+  // Real-time Firestore social feed subscription & auto-backfill for user check-ins
   useEffect(() => {
     const unsubFeed = subscribeToLiveActivityFeed((remoteFeed) => {
       if (remoteFeed && remoteFeed.length > 0) {
         setFeed(remoteFeed);
+
+        // Auto-heal / backfill any tracked shows from current user's past check-ins
+        if (user && user.userId) {
+          const userCheckIns = remoteFeed.filter((c) => c.userId === user.userId);
+          const currentTracked = useTrackerStore.getState().trackedShows;
+          userCheckIns.forEach((checkIn) => {
+            const exists = currentTracked.some((s) => s.tmdbShowId === checkIn.tmdbShowId);
+            if (!exists) {
+              useTrackerStore.getState().addOrUpdateShow({
+                tmdbShowId: checkIn.tmdbShowId,
+                showTitle: checkIn.showTitle,
+                posterPath: checkIn.posterPath || '',
+                status: 'watching',
+                currentSeason: checkIn.seasonNumber,
+                currentEpisode: checkIn.episodeNumber,
+                totalEpisodesWatched: 1,
+                totalEpisodesInShow: 10,
+                nextEpisodeToWatch: {
+                  seasonNumber: checkIn.seasonNumber,
+                  episodeNumber: checkIn.episodeNumber + 1,
+                  title: `Episode ${checkIn.episodeNumber + 1}`,
+                },
+              });
+            }
+          });
+        }
       }
     });
     return () => unsubFeed();
-  }, [setFeed]);
+  }, [setFeed, user]);
 
   // Real-time Firestore tracked shows subscription for authenticated user
   useEffect(() => {
     if (!user || user.userId === 'commander-chief') return;
+
+    // Check feed for any shows the user has checked into that aren't yet in trackedShows
+    const userCheckIns = useCheckInStore.getState().feed.filter((c) => c.userId === user.userId);
+    const currentTracked = useTrackerStore.getState().trackedShows;
+    userCheckIns.forEach((checkIn) => {
+      const exists = currentTracked.some((s) => s.tmdbShowId === checkIn.tmdbShowId);
+      if (!exists) {
+        useTrackerStore.getState().addOrUpdateShow({
+          tmdbShowId: checkIn.tmdbShowId,
+          showTitle: checkIn.showTitle,
+          posterPath: checkIn.posterPath || '',
+          status: 'watching',
+          currentSeason: checkIn.seasonNumber,
+          currentEpisode: checkIn.episodeNumber,
+          totalEpisodesWatched: 1,
+          totalEpisodesInShow: 10,
+          nextEpisodeToWatch: {
+            seasonNumber: checkIn.seasonNumber,
+            episodeNumber: checkIn.episodeNumber + 1,
+            title: `Episode ${checkIn.episodeNumber + 1}`,
+          },
+        });
+      }
+    });
 
     const unsubTracked = subscribeToUserTrackedShows(user.userId, (remoteShows) => {
       if (remoteShows && remoteShows.length > 0) {
@@ -109,9 +158,6 @@ export const AppContent: React.FC = () => {
 
       {/* Fixed Bottom Navigation */}
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
-
-      {/* Prominent Check-in Floating Action Button (FAB) */}
-      <CheckInFAB />
 
       {/* Quick Check-In Selector Modal */}
       <CheckInSelectorModal

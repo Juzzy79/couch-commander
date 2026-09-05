@@ -137,16 +137,21 @@ export const useCheckInStore = create<CheckInState>((set, get) => {
       const tracker = useTrackerStore.getState();
       const badge = useBadgeStore.getState();
 
-      tracker.markEpisodeWatched(
-        target.tmdbShowId,
-        target.seasonNumber,
-        target.episodeNumber,
-        {
+      tracker.addOrUpdateShow({
+        tmdbShowId: target.tmdbShowId,
+        showTitle: target.showTitle,
+        posterPath: target.posterPath || '',
+        status: 'watching',
+        currentSeason: target.seasonNumber,
+        currentEpisode: target.episodeNumber,
+        totalEpisodesWatched: 1,
+        totalEpisodesInShow: target.totalEpisodesInSeason || 10,
+        nextEpisodeToWatch: {
           seasonNumber: target.seasonNumber,
           episodeNumber: target.episodeNumber + 1,
           title: `Episode ${target.episodeNumber + 1}`,
-        }
-      );
+        },
+      });
 
       auth.incrementStreak();
       triggerHaptic('success');
@@ -249,17 +254,22 @@ export const useCheckInStore = create<CheckInState>((set, get) => {
         triggerHaptic('badge');
       }
 
-      // 4. Update Tracker pointer
-      useTrackerStore.getState().markEpisodeWatched(
-        target.tmdbShowId,
-        target.seasonNumber,
-        target.episodeNumber,
-        {
+      // 4. Update Tracker pointer - automatically add to watching & Up Next
+      useTrackerStore.getState().addOrUpdateShow({
+        tmdbShowId: target.tmdbShowId,
+        showTitle: target.showTitle,
+        posterPath: target.posterPath || '',
+        status: 'watching',
+        currentSeason: target.seasonNumber,
+        currentEpisode: target.episodeNumber,
+        totalEpisodesWatched: 1,
+        totalEpisodesInShow: target.totalEpisodesInSeason || 10,
+        nextEpisodeToWatch: {
           seasonNumber: target.seasonNumber,
           episodeNumber: target.episodeNumber + 1,
           title: `Episode ${target.episodeNumber + 1}`,
-        }
-      );
+        },
+      });
 
       // 5. Update Streak
       useAuthStore.getState().incrementStreak();
