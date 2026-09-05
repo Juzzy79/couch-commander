@@ -1,14 +1,23 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users collection: can read if authenticated, only owner can edit profile
+    // Users collection: can read if authenticated, owner has full control, mutual friends can update friends array
     match /users/{userId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow create, delete: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && (
+        request.auth.uid == userId ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends'])
+      );
       
       match /trackedShows/{showId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
+    }
+    
+    // Mutual Friendships collection: connects two users
+    match /friendships/{friendshipId} {
+      allow read, write: if request.auth != null;
     }
     
     // Check-ins: public read for authenticated users, create if authored by user

@@ -14,6 +14,7 @@ import { BadgeUnlockModal } from './components/badges/BadgeUnlockModal';
 import { SettingsModal } from './components/settings/SettingsModal';
 import { ShowDetailModal } from './components/search/ShowDetailModal';
 import { AuthModal } from './components/auth/AuthModal';
+import { FriendInviteModal } from './components/friends/FriendInviteModal';
 import { fetchShowDetails } from './lib/tmdb';
 import { useAuthStore } from './store/useAuthStore';
 import { useCheckInStore } from './store/useCheckInStore';
@@ -178,6 +179,9 @@ export const AppContent: React.FC = () => {
 
       {/* Settings Modal */}
       <SettingsModal />
+
+      {/* Friend Invite Receiver Modal */}
+      <FriendInviteModal />
 
       {/* Detailed Show Inspection Modal */}
       {selectedShowForModal && (

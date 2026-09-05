@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Crown, Award, Users, Edit3, Check, Settings, LogIn, LogOut, UserPlus, Share2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Crown, Award, Users, Edit3, Check, Settings, LogIn, LogOut, UserPlus, Share2, Flame } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { StreakCounter } from './StreakCounter';
@@ -7,6 +7,12 @@ import { StatsOverview } from './StatsOverview';
 import { BadgeGrid } from '../badges/BadgeGrid';
 import { GlassCard } from '../common/GlassCard';
 import { triggerHaptic } from '../../lib/haptics';
+import { AddFriendModal } from '../friends/AddFriendModal';
+import {
+  subscribeToUserFriendships,
+  fetchMultipleUserProfiles,
+} from '../../lib/firestoreService';
+import { UserProfile } from '../../types';
 
 export const ProfileView: React.FC = () => {
   const user = useAuthStore((state) => state.user);
@@ -19,6 +25,36 @@ export const ProfileView: React.FC = () => {
   const [isEditingBio, setIsEditingBio] = useState<boolean>(false);
   const [bioText, setBioText] = useState<string>(user?.bio || '');
   const [sharedToast, setSharedToast] = useState<boolean>(false);
+  const [isAddFriendModalOpen, setIsAddFriendModalOpen] = useState<boolean>(false);
+  const [friendProfiles, setFriendProfiles] = useState<UserProfile[]>([]);
+
+  // Load and subscribe to friend profiles in real time
+  useEffect(() => {
+    if (!user || user.userId === 'guest-user') return;
+
+    // Load initial friends
+    const currentFriends = user.friends || [];
+    if (currentFriends.length > 0) {
+      fetchMultipleUserProfiles(currentFriends).then((profiles) => {
+        setFriendProfiles(profiles);
+      });
+    }
+
+    // Subscribe to any new mutual friendships from Firestore
+    const unsub = subscribeToUserFriendships(user.userId, (newFriendIds) => {
+      const merged = Array.from(new Set([...(user.friends || []), ...newFriendIds]));
+      if (merged.length !== (user.friends || []).length) {
+        updateUser({ friends: merged });
+      }
+      if (merged.length > 0) {
+        fetchMultipleUserProfiles(merged).then((profiles) => {
+          setFriendProfiles(profiles);
+        });
+      }
+    });
+
+    return () => unsub();
+  }, [user?.userId, user?.friends]);
 
   const handleSaveBio = () => {
     updateUser({ bio: bioText });
@@ -27,10 +63,11 @@ export const ProfileView: React.FC = () => {
 
   const handleShareProfile = async () => {
     triggerHaptic('medium');
+    const inviteUrl = `${window.location.origin}?invite=${encodeURIComponent(user?.userId || '')}&name=${encodeURIComponent(user?.displayName || '')}`;
     const shareData = {
       title: `${user?.displayName}'s Couch Commander Profile`,
-      text: `📺 Check out my TV watch stats and badges on Couch Commander! Add me @${user?.username}`,
-      url: window.location.origin,
+      text: `📺 Connect with me on Couch Commander! Tap to add me as a friend and track TV shows together:`,
+      url: inviteUrl,
     };
 
     if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
@@ -67,8 +104,6 @@ export const ProfileView: React.FC = () => {
       </div>
     );
   }
-
-  const friendsList = user.friends || [];
 
   return (
     <div className="pb-32 pt-2">
@@ -212,54 +247,94 @@ export const ProfileView: React.FC = () => {
           <div className="flex items-center gap-1.5">
             <Users className="w-4 h-4 text-teal-400" />
             <h3 className="text-xs font-black uppercase tracking-wider text-white">
-              Friends Circle ({friendsList.length})
+              Friends Circle ({friendProfiles.length})
             </h3>
           </div>
 
-          <button
-            onClick={handleShareProfile}
-            className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 hover:text-emerald-300"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            <span>{sharedToast ? 'Link Copied!' : 'Invite Friends'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsAddFriendModalOpen(true)}
+              className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-800/80 px-2.5 py-1 rounded-xl transition-colors"
+            >
+              <UserPlus className="w-3 h-3" />
+              <span>Add Friend</span>
+            </button>
+            <button
+              onClick={handleShareProfile}
+              className="flex items-center gap-1 text-[11px] font-bold text-black bg-gradient-to-r from-emerald-400 to-teal-400 px-2.5 py-1 rounded-xl shadow-sm hover:opacity-95 transition-opacity"
+            >
+              <Share2 className="w-3 h-3" />
+              <span>{sharedToast ? 'Copied!' : 'Invite'}</span>
+            </button>
+          </div>
         </div>
 
-        {friendsList.length > 0 ? (
-          <div className="grid grid-cols-3 gap-2.5">
-            {friendsList.map((friendId) => (
+        {friendProfiles.length > 0 ? (
+          <div className="grid grid-cols-2 gap-2.5">
+            {friendProfiles.map((friend) => (
               <div
-                key={friendId}
-                className="p-2.5 rounded-xl bg-[#091e14]/70 border border-emerald-900/60 text-center"
+                key={friend.userId}
+                className="p-3 rounded-2xl bg-gradient-to-b from-[#091e14] to-[#05130d] border border-emerald-900/80 flex items-center gap-3 relative overflow-hidden shadow-lg"
               >
                 <img
-                  src={`https://api.dicebear.com/7.x/bottts/svg?seed=${friendId}`}
-                  alt="Friend"
-                  className="w-10 h-10 rounded-full mx-auto object-cover border border-emerald-700"
+                  src={friend.avatarUrl}
+                  alt={friend.displayName}
+                  className="w-11 h-11 rounded-xl object-cover border border-emerald-500/50 shrink-0"
                 />
-                <h4 className="text-xs font-bold text-white mt-1.5 truncate">
-                  {friendId}
-                </h4>
+                <div className="overflow-hidden min-w-0">
+                  <h4 className="text-xs font-black text-white truncate">
+                    {friend.displayName}
+                  </h4>
+                  <p className="text-[10px] font-mono text-emerald-400 truncate">
+                    @{friend.username}
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-orange-950/60 border border-orange-600/40 text-[9px] font-bold text-orange-300">
+                      <Flame className="w-2.5 h-2.5 text-orange-400 fill-orange-400" />
+                      <span>{friend.dailyStreak || 1}d streak</span>
+                    </span>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="p-4 rounded-2xl bg-[#091e14]/50 border border-emerald-900/40 text-center">
-            <UserPlus className="w-8 h-8 text-emerald-700 mx-auto mb-2" />
-            <h4 className="text-xs font-bold text-emerald-200">No Friends Added Yet</h4>
-            <p className="text-[11px] text-emerald-400/70 max-w-xs mx-auto mt-1 mb-3">
-              Share your Commander invite link to connect with friends and compete for Couch Commander crowns.
+          <div className="p-5 rounded-2xl bg-[#091e14]/50 border border-emerald-900/40 text-center">
+            <UserPlus className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+            <h4 className="text-xs font-bold text-emerald-200">No Friends Connected Yet</h4>
+            <p className="text-[11px] text-emerald-400/70 max-w-xs mx-auto mt-1 mb-4 leading-relaxed">
+              Share your personalized invite link or search by username to connect with friends and compare viewing streaks.
             </p>
-            <button
-              onClick={handleShareProfile}
-              className="inline-flex items-center gap-1.5 py-2 px-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-black text-xs font-bold shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              <span>{sharedToast ? 'Invite Link Copied!' : 'Share Invite Link'}</span>
-            </button>
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={() => setIsAddFriendModalOpen(true)}
+                className="inline-flex items-center gap-1.5 py-2 px-3.5 rounded-xl bg-emerald-950 hover:bg-emerald-900 border border-emerald-700 text-emerald-300 text-xs font-bold transition-all"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Search Username</span>
+              </button>
+              <button
+                onClick={handleShareProfile}
+                className="inline-flex items-center gap-1.5 py-2 px-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-black text-xs font-bold shadow-md shadow-emerald-500/20 active:scale-95 transition-all"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>{sharedToast ? 'Invite Link Copied!' : 'Share Invite Link'}</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Find / Add Friend Modal */}
+      <AddFriendModal
+        isOpen={isAddFriendModalOpen}
+        onClose={() => setIsAddFriendModalOpen(false)}
+        onFriendAdded={() => {
+          if (user?.friends) {
+            fetchMultipleUserProfiles(user.friends).then((p) => setFriendProfiles(p));
+          }
+        }}
+      />
     </div>
   );
 };

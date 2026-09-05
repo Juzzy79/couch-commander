@@ -2,9 +2,13 @@ import {
   doc,
   setDoc,
   getDoc,
+  updateDoc,
   collection,
   onSnapshot,
   query,
+  where,
+  getDocs,
+  arrayUnion,
   orderBy,
   limit,
 } from 'firebase/firestore';
@@ -167,3 +171,144 @@ export function subscribeToShowStats(
     return () => {};
   }
 }
+
+/**
+ * Create a mutual friendship between two users
+ */
+export async function createMutualFriendship(userAId: string, userBId: string): Promise<boolean> {
+  if (!userAId || !userBId || userAId === userBId) return false;
+  try {
+    const friendshipId = [userAId, userBId].sort().join('_');
+    const friendshipRef = doc(db, 'friendships', friendshipId);
+    await setDoc(
+      friendshipRef,
+      {
+        users: [userAId, userBId],
+        status: 'accepted',
+        createdAt: Date.now(),
+      },
+      { merge: true }
+    );
+
+    // Update userA's friends array if not guest
+    if (userAId !== 'guest-user') {
+      const userARef = doc(db, 'users', userAId);
+      await updateDoc(userARef, {
+        friends: arrayUnion(userBId),
+      }).catch(async () => {
+        await setDoc(userARef, { friends: [userBId] }, { merge: true });
+      });
+    }
+
+    // Update userB's friends array if not guest
+    if (userBId !== 'guest-user') {
+      const userBRef = doc(db, 'users', userBId);
+      await updateDoc(userBRef, {
+        friends: arrayUnion(userAId),
+      }).catch(async () => {
+        await setDoc(userBRef, { friends: [userAId] }, { merge: true });
+      });
+    }
+
+    return true;
+  } catch (err) {
+    console.warn('Could not create mutual friendship:', err);
+    return false;
+  }
+}
+
+/**
+ * Real-time listener for user friendships
+ */
+export function subscribeToUserFriendships(
+  userId: string,
+  onUpdate: (friendIds: string[]) => void
+): () => void {
+  if (!userId || userId === 'guest-user') return () => {};
+  try {
+    const q = query(
+      collection(db, 'friendships'),
+      where('users', 'array-contains', userId)
+    );
+    return onSnapshot(
+      q,
+      (snapshot) => {
+        const friendIds: string[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          const users = (data.users as string[]) || [];
+          const other = users.find((u) => u !== userId);
+          if (other && !friendIds.includes(other)) {
+            friendIds.push(other);
+          }
+        });
+        onUpdate(friendIds);
+      },
+      (err) => {
+        console.warn('Friendship subscription notice:', err);
+      }
+    );
+  } catch {
+    return () => {};
+  }
+}
+
+/**
+ * Fetch profiles for a list of user IDs
+ */
+export async function fetchMultipleUserProfiles(userIds: string[]): Promise<UserProfile[]> {
+  if (!userIds || userIds.length === 0) return [];
+  const profiles: UserProfile[] = [];
+  try {
+    for (const uid of userIds) {
+      if (!uid || uid === 'guest-user') continue;
+      const profile = await fetchUserProfileFromFirestore(uid);
+      if (profile) {
+        profiles.push(profile);
+      } else {
+        profiles.push({
+          userId: uid,
+          username: `user_${uid.slice(0, 6)}`,
+          displayName: `Commander ${uid.slice(0, 4)}`,
+          avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${uid}`,
+          dailyStreak: 0,
+          lastCheckInDate: '',
+          badges: [],
+          friends: [],
+          createdAt: Date.now(),
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('Error fetching multiple user profiles:', err);
+  }
+  return profiles;
+}
+
+/**
+ * Search users by username or display name
+ */
+export async function searchUsers(searchTerm: string): Promise<UserProfile[]> {
+  const term = searchTerm.trim().toLowerCase().replace('@', '');
+  if (!term) return [];
+  try {
+    const usersRef = collection(db, 'users');
+    const snapshot = await getDocs(usersRef);
+    const results: UserProfile[] = [];
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as UserProfile;
+      if (
+        data.username?.toLowerCase().includes(term) ||
+        data.displayName?.toLowerCase().includes(term) ||
+        data.userId.toLowerCase() === term
+      ) {
+        results.push(data);
+      }
+    });
+    return results;
+  } catch (err) {
+    console.warn('Search users error:', err);
+    return [];
+  }
+}
+
