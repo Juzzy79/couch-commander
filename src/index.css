@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --sat: env(safe-area-inset-top);
+  --sab: env(safe-area-inset-bottom);
+  --sal: env(safe-area-inset-left);
+  --sar: env(safe-area-inset-right);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #05130d;
+  background-image: radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.15) 0%, rgba(5, 19, 13, 0.95) 75%, #030c08 100%);
+  background-attachment: fixed;
+  color: #f0fdf4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  overscroll-behavior-y: none;
+}
+
+/* Custom scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Safe area padding utilities */
+.pt-safe-top {
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+}
+.pb-safe-bottom {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+/* Custom Glassmorphism reflections */
+.glass-glow-forest {
+  box-shadow: 0 0 25px rgba(16, 185, 129, 0.22);
+}
+
+.glass-glow-gold {
+  box-shadow: 0 0 25px rgba(245, 158, 11, 0.2);
+}
+
+.glass-glow-violet {
+  box-shadow: 0 0 25px rgba(139, 92, 246, 0.2);
+}
