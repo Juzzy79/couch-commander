@@ -22,6 +22,7 @@ interface ActiveCheckInTarget {
 
 interface CheckInState {
   isBottomSheetOpen: boolean;
+  isQuickSelectorOpen: boolean;
   activeTarget: ActiveCheckInTarget | null;
   feed: CheckIn[];
   showStats: Record<number, ShowStats>;
@@ -32,6 +33,8 @@ interface CheckInState {
   clearFeed: () => void;
   openCheckInModal: (target: ActiveCheckInTarget) => void;
   closeCheckInModal: () => void;
+  openQuickSelector: () => void;
+  closeQuickSelector: () => void;
   submitCheckIn: (comment: string, isSpoiler: boolean) => Promise<CheckIn | null>;
   quickWatch: (target: ActiveCheckInTarget) => void;
   toggleLikeCheckIn: (checkInId: string) => void;
@@ -71,6 +74,7 @@ export const useCheckInStore = create<CheckInState>((set, get) => {
 
   return {
     isBottomSheetOpen: false,
+    isQuickSelectorOpen: false,
     activeTarget: null,
     feed: initialFeed,
     showStats: initialStats,
@@ -97,11 +101,20 @@ export const useCheckInStore = create<CheckInState>((set, get) => {
 
     openCheckInModal: (target) => {
       triggerHaptic('light');
-      set({ activeTarget: target, isBottomSheetOpen: true });
+      set({ activeTarget: target, isBottomSheetOpen: true, isQuickSelectorOpen: false });
     },
 
     closeCheckInModal: () => {
       set({ isBottomSheetOpen: false, activeTarget: null });
+    },
+
+    openQuickSelector: () => {
+      triggerHaptic('light');
+      set({ isQuickSelectorOpen: true });
+    },
+
+    closeQuickSelector: () => {
+      set({ isQuickSelectorOpen: false });
     },
 
     getShowStats: (showId: number) => {

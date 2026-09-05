@@ -21,8 +21,8 @@ export const ActivityFeed: React.FC = () => {
   };
 
   return (
-    <div className="pb-24 pt-2">
-      {/* Header Info */}
+    <div className="pb-32 pt-2">
+      {/* Feed Filters & Controls */}
       <div className="px-4 mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-400">

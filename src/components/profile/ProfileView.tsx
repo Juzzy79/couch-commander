@@ -71,7 +71,7 @@ export const ProfileView: React.FC = () => {
   const friendsList = user.friends || [];
 
   return (
-    <div className="pb-24 pt-2">
+    <div className="pb-32 pt-2">
       {/* Guest Mode Alert Banner */}
       {isGuest && (
         <div className="px-4 mb-3">

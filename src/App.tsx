@@ -9,6 +9,8 @@ import { SearchScreen } from './components/search/SearchScreen';
 import { ActivityFeed } from './components/activity/ActivityFeed';
 import { ProfileView } from './components/profile/ProfileView';
 import { CheckInBottomSheet } from './components/checkin/CheckInBottomSheet';
+import { CheckInSelectorModal } from './components/checkin/CheckInSelectorModal';
+import { CheckInFAB } from './components/common/CheckInFAB';
 import { BadgeUnlockModal } from './components/badges/BadgeUnlockModal';
 import { SettingsModal } from './components/settings/SettingsModal';
 import { ShowDetailModal } from './components/search/ShowDetailModal';
@@ -107,6 +109,14 @@ export const AppContent: React.FC = () => {
 
       {/* Fixed Bottom Navigation */}
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+
+      {/* Prominent Check-in Floating Action Button (FAB) */}
+      <CheckInFAB />
+
+      {/* Quick Check-In Selector Modal */}
+      <CheckInSelectorModal
+        onOpenShowDetails={(show) => setSelectedShowForModal(show)}
+      />
 
       {/* Global Check-in Bottom Sheet */}
       <CheckInBottomSheet />

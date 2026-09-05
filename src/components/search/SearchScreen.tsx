@@ -37,7 +37,7 @@ export const SearchScreen: React.FC = () => {
   }, [query]);
 
   return (
-    <div className="pb-24 pt-2">
+    <div className="pb-32 pt-2">
       {/* Search Input Bar */}
       <div className="px-4 mb-5">
         <div className="relative">

@@ -33,7 +33,7 @@ export const UpNextScreen: React.FC<UpNextScreenProps> = ({
   ];
 
   return (
-    <div className="pb-24 pt-2">
+    <div className="pb-32 pt-2">
       {/* Top Banner: Forest Green Gradient & Daily Streak */}
       <div className="px-4 mb-4">
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-950/90 via-teal-950/70 to-[#06180f] border border-emerald-500/30 p-4 shadow-xl shadow-black/50">
