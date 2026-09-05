@@ -12,9 +12,9 @@ export default defineConfig({
       manifest: {
         name: 'Couch Commander',
         short_name: 'CouchCmdr',
-        description: 'Track TV shows, live episode check-ins, GetGlue badges, and compete for Couch Commander.',
-        theme_color: '#09090b',
-        background_color: '#09090b',
+        description: 'Track TV shows, live episode check-ins, collectible badges, and compete for Couch Commander.',
+        theme_color: '#05130d',
+        background_color: '#05130d',
         display: 'standalone',
         orientation: 'portrait',
         scope: '/',

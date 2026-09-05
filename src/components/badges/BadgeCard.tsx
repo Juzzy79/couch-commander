@@ -76,7 +76,7 @@ export const BadgeCard: React.FC<BadgeCardProps> = ({
             : 'border-zinc-800/60 bg-zinc-950/60'
         }`}
       >
-        {/* GetGlue Holographic Badge Sticker */}
+        {/* Holographic Badge Sticker */}
         <div className="relative mt-1">
           <div
             className={`flex items-center justify-center rounded-2xl p-3 bg-gradient-to-br ${badge.gradient} shadow-lg transition-transform duration-300 group-hover:rotate-6 group-hover:scale-105`}

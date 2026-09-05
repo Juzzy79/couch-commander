@@ -24,7 +24,7 @@ export const Header: React.FC = () => {
               Couch Commander
             </h1>
             <p className="text-[10px] font-medium text-emerald-300/80 tracking-wider uppercase flex items-center gap-1">
-              <span>GetGlue</span>
+              <span>TV Tracker</span>
               <span className="text-emerald-700">•</span>
               <span className="text-emerald-400 font-semibold flex items-center gap-0.5">
                 <Sparkles className="w-2.5 h-2.5" /> PWA

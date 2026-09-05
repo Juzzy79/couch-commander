@@ -29,7 +29,7 @@ export const ProfileView: React.FC = () => {
     triggerHaptic('medium');
     const shareData = {
       title: `${user?.displayName}'s Couch Commander Profile`,
-      text: `📺 Check out my TV watch stats and GetGlue badges on Couch Commander! Add me @${user?.username}`,
+      text: `📺 Check out my TV watch stats and badges on Couch Commander! Add me @${user?.username}`,
       url: window.location.origin,
     };
 
@@ -56,7 +56,7 @@ export const ProfileView: React.FC = () => {
         <Crown className="w-12 h-12 text-amber-400 mx-auto mb-3" />
         <h3 className="text-base font-bold text-white mb-2">Join Couch Commander</h3>
         <p className="text-xs text-emerald-300/80 mb-4 max-w-xs mx-auto">
-          Sign in to track your shows, build streaks, unlock GetGlue stickers, and claim #1 ranks.
+          Sign in to track your shows, build streaks, unlock collectible stickers, and claim #1 ranks.
         </p>
         <button
           onClick={openAuthModal}
@@ -189,13 +189,13 @@ export const ProfileView: React.FC = () => {
         <StatsOverview />
       </div>
 
-      {/* GetGlue Collectible Badges Showcase */}
+      {/* Commander Collectible Badges Showcase */}
       <div className="px-4 mb-6">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-1.5">
             <Award className="w-4 h-4 text-emerald-400" />
             <h3 className="text-xs font-black uppercase tracking-wider text-white">
-              GetGlue Badges & Stickers ({(user.badges || []).length})
+              Commander Badges & Stickers ({(user.badges || []).length})
             </h3>
           </div>
           <span className="text-[10px] text-emerald-400/70 font-medium">

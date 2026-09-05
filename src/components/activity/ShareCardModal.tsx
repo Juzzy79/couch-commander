@@ -46,7 +46,7 @@ export const ShareCardModal: React.FC<ShareCardModalProps> = ({ checkIn, onClose
             Share Check-In
           </h3>
 
-          {/* Holographic GetGlue Style Card Preview */}
+          {/* Holographic Style Card Preview */}
           <div className="relative rounded-2xl overflow-hidden bg-gradient-to-b from-zinc-900 to-zinc-950 border-2 border-amber-500/40 p-4 shadow-xl mb-5">
             {/* Header Badge */}
             <div className="flex items-center justify-between mb-3">

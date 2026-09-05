@@ -71,7 +71,7 @@ export const AuthModal: React.FC = () => {
               {mode === 'signin' ? 'Sign In to Couch Commander' : 'Create Commander Profile'}
             </h3>
             <p className="text-xs text-emerald-300/80 mt-1 max-w-xs mx-auto">
-              Sync your personal viewing progress, earn GetGlue badges, and compete with friends.
+              Sync your personal viewing progress, collect badges, and compete with friends.
             </p>
           </div>
 
