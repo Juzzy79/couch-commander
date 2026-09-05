@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Key, Vibrate, Check, Sparkles, User, Trash2 } from 'lucide-react';
+import { X, Key, Vibrate, Check, Sparkles, User, Trash2, Loader2, AlertCircle } from 'lucide-react';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useTrackerStore } from '../../store/useTrackerStore';
 import { triggerHaptic } from '../../lib/haptics';
+import { testTMDBApiKey } from '../../lib/tmdb';
 
 export const SettingsModal: React.FC = () => {
   const isSettingsOpen = useSettingsStore((state) => state.isSettingsOpen);
@@ -19,11 +20,36 @@ export const SettingsModal: React.FC = () => {
   const clearUserData = useAuthStore((state) => state.clearUserData);
   const clearAllShows = useTrackerStore((state) => state.clearAllShows);
 
-  const [keyInput, setKeyInput] = useState<string>(tmdbApiKey);
+  const [keyInput, setKeyInput] = useState<string>(tmdbApiKey || user?.tmdbApiKey || '');
   const [displayName, setDisplayName] = useState<string>(user?.displayName || '');
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
+  const [isTesting, setIsTesting] = useState<boolean>(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Sync state whenever settings modal opens
+  useEffect(() => {
+    if (isSettingsOpen) {
+      setKeyInput(tmdbApiKey || user?.tmdbApiKey || '');
+      setDisplayName(user?.displayName || '');
+      setTestResult(null);
+    }
+  }, [isSettingsOpen, tmdbApiKey, user?.tmdbApiKey, user?.displayName]);
 
   if (!isSettingsOpen) return null;
+
+  const handleTestKey = async () => {
+    if (!keyInput.trim()) return;
+    setIsTesting(true);
+    setTestResult(null);
+    triggerHaptic('light');
+
+    const res = await testTMDBApiKey(keyInput.trim());
+    setIsTesting(false);
+    setTestResult(res);
+    if (res.success) {
+      triggerHaptic('success');
+    }
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +62,7 @@ export const SettingsModal: React.FC = () => {
     setTimeout(() => {
       setSavedSuccess(false);
       closeSettings();
-    }, 1000);
+    }, 900);
   };
 
   const handleCleanSlate = () => {
@@ -98,8 +124,8 @@ export const SettingsModal: React.FC = () => {
             </div>
 
             {/* TMDB API Key */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-emerald-300/90 flex items-center gap-1.5">
                   <Key className="w-3.5 h-3.5 text-emerald-400" />
                   <span>TMDB API Key (Optional)</span>
@@ -113,13 +139,91 @@ export const SettingsModal: React.FC = () => {
                   Get free key
                 </a>
               </div>
-              <input
-                type="text"
-                value={keyInput}
-                onChange={(e) => setKeyInput(e.target.value)}
-                placeholder="Enter TMDB API Key or leave empty for offline demo"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-[#091e14] border border-emerald-900 text-sm text-white placeholder-emerald-700 font-mono text-xs focus:outline-none focus:border-emerald-500 shadow-inner"
-              />
+
+              {/* Status Pill */}
+              <div className="p-2.5 rounded-xl bg-[#091e14]/70 border border-emerald-900/80 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs">
+                  {tmdbApiKey || user?.tmdbApiKey ? (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="text-emerald-300 font-bold">Status: Saved & Active</span>
+                      <span className="font-mono text-[10px] text-emerald-400/80">
+                        ••••{(tmdbApiKey || user?.tmdbApiKey || '').slice(-4)}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-teal-600" />
+                      <span className="text-emerald-400/70 text-[11px]">
+                        Status: Empty (Universal TVMaze database active)
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {(tmdbApiKey || user?.tmdbApiKey) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setKeyInput('');
+                      setTmdbApiKey('');
+                      setTestResult(null);
+                      triggerHaptic('light');
+                    }}
+                    className="text-[10px] text-rose-400 hover:text-rose-300 underline"
+                  >
+                    Clear Key
+                  </button>
+                )}
+              </div>
+
+              {/* Input & Test Button Row */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={keyInput}
+                  onChange={(e) => {
+                    setKeyInput(e.target.value);
+                    setTestResult(null);
+                  }}
+                  placeholder="Paste your 32-character TMDB API key here"
+                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#091e14] border border-emerald-900 text-xs text-white placeholder-emerald-700 font-mono focus:outline-none focus:border-emerald-500 shadow-inner"
+                />
+                <button
+                  type="button"
+                  onClick={handleTestKey}
+                  disabled={isTesting || !keyInput.trim()}
+                  className="px-3 py-2 rounded-xl bg-[#0e2a1d] hover:bg-[#153e2a] border border-emerald-700 disabled:opacity-50 text-xs font-bold text-emerald-300 flex items-center gap-1.5 shrink-0 transition-colors"
+                >
+                  {isTesting ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <span>Test Key</span>
+                  )}
+                </button>
+              </div>
+
+              {/* Test Result Feedback */}
+              {testResult && (
+                <div
+                  className={`p-2.5 rounded-xl border text-xs flex items-center gap-2 ${
+                    testResult.success
+                      ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
+                      : 'bg-rose-950/40 border-rose-600/50 text-rose-300'
+                  }`}
+                >
+                  {testResult.success ? (
+                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  )}
+                  <span className="text-[11px] leading-tight">{testResult.message}</span>
+                </div>
+              )}
+
+              <p className="text-[10px] text-emerald-500/80 leading-relaxed">
+                When provided, Couch Commander queries TMDB for high-definition posters, backdrops, and streaming channels. When empty, it uses the free TVMaze TV directory.
+              </p>
             </div>
 
             {/* Haptic Toggle */}

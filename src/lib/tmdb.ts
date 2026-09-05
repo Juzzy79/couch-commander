@@ -16,6 +16,24 @@ export function getTMDBApiKey(): string {
   return (import.meta.env.VITE_TMDB_API_KEY as string) || '';
 }
 
+export async function testTMDBApiKey(key: string): Promise<{ success: boolean; message: string }> {
+  const cleanKey = key.trim();
+  if (!cleanKey) {
+    return { success: false, message: 'API key is empty.' };
+  }
+  try {
+    const res = await fetch(`https://api.themoviedb.org/3/authentication?api_key=${cleanKey}`);
+    const data = await res.json();
+    if (data.success) {
+      return { success: true, message: 'Valid & Connected! TMDB API v3 verified.' };
+    } else {
+      return { success: false, message: data.status_message || 'Invalid TMDB API key.' };
+    }
+  } catch {
+    return { success: false, message: 'Network request error while testing TMDB key.' };
+  }
+}
+
 function stripHtml(html: string | null | undefined): string {
   if (!html) return '';
   return html.replace(/<[^>]*>?/gm, '').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#039;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();

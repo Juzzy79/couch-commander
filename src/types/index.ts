@@ -12,6 +12,7 @@ export interface UserProfile {
   lastCheckInDate: string; // YYYY-MM-DD
   badges: string[]; // Badge IDs
   friends: string[]; // User IDs
+  tmdbApiKey?: string;
   createdAt: number;
 }
 

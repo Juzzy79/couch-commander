@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Crown, Award, Users, Edit3, Check, Settings, LogIn, LogOut, UserPlus, Share2, Flame } from 'lucide-react';
+import { Crown, Award, Users, Edit3, Check, Settings, LogIn, LogOut, UserPlus, Share2, Flame, Database } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { StreakCounter } from './StreakCounter';
@@ -21,6 +21,9 @@ export const ProfileView: React.FC = () => {
   const logout = useAuthStore((state) => state.logout);
   const updateUser = useAuthStore((state) => state.updateUser);
   const openSettings = useSettingsStore((state) => state.openSettings);
+  const tmdbApiKey = useSettingsStore((state) => state.tmdbApiKey);
+
+  const effectiveTmdbKey = (tmdbApiKey || user?.tmdbApiKey || '').trim();
 
   const [isEditingBio, setIsEditingBio] = useState<boolean>(false);
   const [bioText, setBioText] = useState<string>(user?.bio || '');
@@ -210,6 +213,36 @@ export const ProfileView: React.FC = () => {
                 <Edit3 className="w-3.5 h-3.5 text-emerald-600 group-hover:text-emerald-400 transition-colors" />
               </div>
             )}
+          </div>
+
+          {/* Database & TMDB Status */}
+          <div className="mt-3 pt-3 border-t border-emerald-900/60 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-1 rounded-lg bg-[#0e2a1d] text-emerald-400">
+                <Database className="w-3.5 h-3.5" />
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px]">
+                <span className="text-emerald-400/80 font-medium">Database:</span>
+                {effectiveTmdbKey ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-[10px] font-bold text-emerald-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>TMDB Connected (••••{effectiveTmdbKey.slice(-4)})</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#05130d] border border-emerald-800/60 text-[10px] text-emerald-400/70">
+                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                    <span>TVMaze Universal (Active)</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={openSettings}
+              className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 underline underline-offset-2"
+            >
+              {effectiveTmdbKey ? 'Manage' : 'Add TMDB Key'}
+            </button>
           </div>
         </GlassCard>
       </div>

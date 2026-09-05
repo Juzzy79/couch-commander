@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useAuthStore } from './useAuthStore';
 
 interface SettingsState {
   isSettingsOpen: boolean;
@@ -27,11 +28,16 @@ export const useSettingsStore = create<SettingsState>((set) => {
     closeSettings: () => set({ isSettingsOpen: false }),
 
     setTmdbApiKey: (key) => {
-      set({ tmdbApiKey: key });
+      const cleanKey = key.trim();
+      set({ tmdbApiKey: cleanKey });
       try {
-        localStorage.setItem('couch_commander_tmdb_key', key);
+        localStorage.setItem('couch_commander_tmdb_key', cleanKey);
       } catch {
         // ignore
+      }
+      const authUser = useAuthStore.getState().user;
+      if (authUser && authUser.userId && authUser.userId !== 'guest-user') {
+        useAuthStore.getState().updateUser({ tmdbApiKey: cleanKey });
       }
     },
 
