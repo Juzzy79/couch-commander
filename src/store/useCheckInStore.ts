@@ -137,15 +137,18 @@ export const useCheckInStore = create<CheckInState>((set, get) => {
       const tracker = useTrackerStore.getState();
       const badge = useBadgeStore.getState();
 
+      const existingShow = tracker.getTrackedShow(target.tmdbShowId);
+      const currentEpisodesCount = existingShow?.totalEpisodesWatched || 0;
+
       tracker.addOrUpdateShow({
         tmdbShowId: target.tmdbShowId,
         showTitle: target.showTitle,
-        posterPath: target.posterPath || '',
+        posterPath: target.posterPath || (existingShow?.posterPath || ''),
         status: 'watching',
         currentSeason: target.seasonNumber,
         currentEpisode: target.episodeNumber,
-        totalEpisodesWatched: 1,
-        totalEpisodesInShow: target.totalEpisodesInSeason || 10,
+        totalEpisodesWatched: currentEpisodesCount + 1,
+        totalEpisodesInShow: target.totalEpisodesInSeason || (existingShow?.totalEpisodesInShow || 10),
         nextEpisodeToWatch: {
           seasonNumber: target.seasonNumber,
           episodeNumber: target.episodeNumber + 1,
@@ -255,15 +258,18 @@ export const useCheckInStore = create<CheckInState>((set, get) => {
       }
 
       // 4. Update Tracker pointer - automatically add to watching & Up Next
+      const existingShow = useTrackerStore.getState().getTrackedShow(target.tmdbShowId);
+      const currentEpisodesCount = existingShow?.totalEpisodesWatched || 0;
+
       useTrackerStore.getState().addOrUpdateShow({
         tmdbShowId: target.tmdbShowId,
         showTitle: target.showTitle,
-        posterPath: target.posterPath || '',
+        posterPath: target.posterPath || (existingShow?.posterPath || ''),
         status: 'watching',
         currentSeason: target.seasonNumber,
         currentEpisode: target.episodeNumber,
-        totalEpisodesWatched: 1,
-        totalEpisodesInShow: target.totalEpisodesInSeason || 10,
+        totalEpisodesWatched: currentEpisodesCount + 1,
+        totalEpisodesInShow: target.totalEpisodesInSeason || (existingShow?.totalEpisodesInShow || 10),
         nextEpisodeToWatch: {
           seasonNumber: target.seasonNumber,
           episodeNumber: target.episodeNumber + 1,

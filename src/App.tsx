@@ -65,27 +65,44 @@ export const AppContent: React.FC = () => {
     const currentTracked = useTrackerStore.getState().trackedShows;
     const currentUser = useAuthStore.getState().user;
 
-    checkIns.forEach((checkIn) => {
-      if (isUserCheckIn(checkIn, currentUser)) {
-        const exists = currentTracked.some((s) => s.tmdbShowId === checkIn.tmdbShowId);
-        if (!exists) {
-          useTrackerStore.getState().addOrUpdateShow({
-            tmdbShowId: checkIn.tmdbShowId,
-            showTitle: checkIn.showTitle,
-            posterPath: checkIn.posterPath || '',
-            status: 'watching',
-            currentSeason: checkIn.seasonNumber || 1,
-            currentEpisode: checkIn.episodeNumber || 1,
-            totalEpisodesWatched: 1,
-            totalEpisodesInShow: 10,
-            nextEpisodeToWatch: {
-              seasonNumber: checkIn.seasonNumber || 1,
-              episodeNumber: (checkIn.episodeNumber || 1) + 1,
-              title: `Episode ${(checkIn.episodeNumber || 1) + 1}`,
-            },
-          });
-        }
-      }
+    // Group user check-ins by show
+    const userCheckIns = checkIns.filter((c) => isUserCheckIn(c, currentUser));
+    const showCheckInsMap = new Map<number, any[]>();
+    userCheckIns.forEach((c) => {
+      const arr = showCheckInsMap.get(c.tmdbShowId) || [];
+      arr.push(c);
+      showCheckInsMap.set(c.tmdbShowId, arr);
+    });
+
+    showCheckInsMap.forEach((showCheckIns, showId) => {
+      // Sort chronologically
+      showCheckIns.sort(
+        (a, b) => (a.seasonNumber - b.seasonNumber) || (a.episodeNumber - b.episodeNumber)
+      );
+      const latestCheckIn = showCheckIns[showCheckIns.length - 1];
+      const existing = currentTracked.find((s) => s.tmdbShowId === showId);
+
+      const uniqueWatchedCount = new Set(
+        showCheckIns.map((c) => `S${c.seasonNumber}E${c.episodeNumber}`)
+      ).size;
+
+      const totalWatched = Math.max(existing?.totalEpisodesWatched || 0, uniqueWatchedCount);
+
+      useTrackerStore.getState().addOrUpdateShow({
+        tmdbShowId: showId,
+        showTitle: latestCheckIn.showTitle,
+        posterPath: latestCheckIn.posterPath || (existing?.posterPath || ''),
+        status: 'watching',
+        currentSeason: latestCheckIn.seasonNumber || 1,
+        currentEpisode: latestCheckIn.episodeNumber || 1,
+        totalEpisodesWatched: totalWatched,
+        totalEpisodesInShow: existing?.totalEpisodesInShow || 10,
+        nextEpisodeToWatch: {
+          seasonNumber: latestCheckIn.seasonNumber || 1,
+          episodeNumber: (latestCheckIn.episodeNumber || 1) + 1,
+          title: `Episode ${(latestCheckIn.episodeNumber || 1) + 1}`,
+        },
+      });
     });
   };
 

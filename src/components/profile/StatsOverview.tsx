@@ -10,10 +10,28 @@ export const StatsOverview: React.FC = () => {
   const user = useAuthStore((state) => state.user);
   const showStats = useCheckInStore((state) => state.showStats);
 
-  const totalWatchedEpisodes = trackedShows.reduce(
+  const feed = useCheckInStore((state) => state.feed);
+
+  // Compute unique episodes checked into by the user across feed
+  const userCheckInsCount = new Set(
+    feed
+      .filter((c) => {
+        if (!user) return false;
+        if (c.userId === user.userId) return true;
+        if (user.displayName && c.userName?.toLowerCase() === user.displayName.toLowerCase()) return true;
+        if (user.username && c.userName?.toLowerCase() === user.username.toLowerCase()) return true;
+        if (c.userId === 'guest-user') return true;
+        return false;
+      })
+      .map((c) => `${c.tmdbShowId}-S${c.seasonNumber}E${c.episodeNumber}`)
+  ).size;
+
+  const totalTrackedEpisodes = trackedShows.reduce(
     (acc, s) => acc + (s.totalEpisodesWatched || 0),
     0
   );
+
+  const totalWatchedEpisodes = Math.max(totalTrackedEpisodes, userCheckInsCount);
 
   const commanderCrownsCount = Object.values(showStats).filter(
     (s) => user && s.couchCommander?.userId === user.userId
