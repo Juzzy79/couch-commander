@@ -23,7 +23,7 @@ export const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show: initialS
   useEffect(() => {
     if (!initialShow) return;
     setShow(initialShow);
-    fetchShowDetails(initialShow.id).then((full) => {
+    fetchShowDetails(initialShow.id, initialShow.name).then((full) => {
       if (full) {
         setShow(full);
       }
@@ -45,7 +45,7 @@ export const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show: initialS
     let isMounted = true;
     setIsLoadingSeason(true);
 
-    fetchSeasonDetails(show.id, selectedSeasonNumber).then((data) => {
+    fetchSeasonDetails(show.id, selectedSeasonNumber, show.name).then((data) => {
       if (isMounted) {
         setSeasonDetail(data);
         setIsLoadingSeason(false);

@@ -80,7 +80,18 @@ export const AppContent: React.FC = () => {
         (a, b) => (a.seasonNumber - b.seasonNumber) || (a.episodeNumber - b.episodeNumber)
       );
       const latestCheckIn = showCheckIns[showCheckIns.length - 1];
-      const existing = currentTracked.find((s) => s.tmdbShowId === showId);
+
+      // Automatically migrate legacy TVMaze ID 64992 for "The Gentlemen" to TMDB 236235
+      const effectiveShowId =
+        showId === 64992 && latestCheckIn.showTitle?.toLowerCase().includes('gentlemen')
+          ? 236235
+          : showId;
+
+      if (effectiveShowId !== showId) {
+        useTrackerStore.getState().removeTrackedShow(showId);
+      }
+
+      const existing = currentTracked.find((s) => s.tmdbShowId === effectiveShowId);
 
       const uniqueWatchedCount = new Set(
         showCheckIns.map((c) => `S${c.seasonNumber}E${c.episodeNumber}`)
@@ -89,14 +100,21 @@ export const AppContent: React.FC = () => {
       const totalWatched = Math.max(existing?.totalEpisodesWatched || 0, uniqueWatchedCount);
 
       useTrackerStore.getState().addOrUpdateShow({
-        tmdbShowId: showId,
+        tmdbShowId: effectiveShowId,
         showTitle: latestCheckIn.showTitle,
-        posterPath: latestCheckIn.posterPath || (existing?.posterPath || ''),
+        posterPath:
+          effectiveShowId === 236235
+            ? '/2l0gBLpjcWo4ivmbHUhFIw3KGDn.jpg'
+            : latestCheckIn.posterPath || (existing?.posterPath || ''),
+        backdropPath:
+          effectiveShowId === 236235
+            ? '/yG1wltFmkX5c5ocACKfpX0tp3SY.jpg'
+            : existing?.backdropPath,
         status: 'watching',
         currentSeason: latestCheckIn.seasonNumber || 1,
         currentEpisode: latestCheckIn.episodeNumber || 1,
         totalEpisodesWatched: totalWatched,
-        totalEpisodesInShow: existing?.totalEpisodesInShow || 10,
+        totalEpisodesInShow: existing?.totalEpisodesInShow || 8,
         nextEpisodeToWatch: {
           seasonNumber: latestCheckIn.seasonNumber || 1,
           episodeNumber: (latestCheckIn.episodeNumber || 1) + 1,
@@ -134,7 +152,12 @@ export const AppContent: React.FC = () => {
 
     const unsubTracked = subscribeToUserTrackedShows(user.userId, (remoteShows) => {
       if (remoteShows && remoteShows.length > 0) {
-        setTrackedShows(remoteShows);
+        // Clean out legacy 64992 if 236235 is present
+        const hasGentlemen236235 = remoteShows.some((s) => s.tmdbShowId === 236235);
+        const filtered = hasGentlemen236235
+          ? remoteShows.filter((s) => s.tmdbShowId !== 64992)
+          : remoteShows;
+        setTrackedShows(filtered);
       }
     });
 
@@ -142,8 +165,19 @@ export const AppContent: React.FC = () => {
   }, [user, setTrackedShows]);
 
   const handleOpenShowDetails = async (tracked: TrackedShow) => {
-    const show = await fetchShowDetails(tracked.tmdbShowId);
+    const show = await fetchShowDetails(tracked.tmdbShowId, tracked.showTitle);
     if (show) {
+      // If the show ID was migrated to a real TMDB ID (e.g. from TVMaze 64992 -> TMDB 236235)
+      if (show.id !== tracked.tmdbShowId) {
+        useTrackerStore.getState().removeTrackedShow(tracked.tmdbShowId);
+        useTrackerStore.getState().addOrUpdateShow({
+          ...tracked,
+          tmdbShowId: show.id,
+          showTitle: show.name,
+          posterPath: show.poster_path || tracked.posterPath,
+          backdropPath: show.backdrop_path || tracked.backdropPath,
+        });
+      }
       setSelectedShowForModal(show);
     } else {
       setSelectedShowForModal({

@@ -112,6 +112,19 @@ function mapTVMazeToShow(show: TVMazeShowItem): TMDBShow {
 // In-memory cache for fast lookups and offline resilience
 const showDetailsCache = new Map<number, TMDBShow>();
 const seasonDetailsCache = new Map<string, TMDBSeasonDetail>();
+const showIdAliasMap = new Map<number, number>();
+
+function normalizeTitle(title: string): string {
+  return (title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function titlesMatch(a: string, b: string): boolean {
+  if (!a || !b) return true;
+  const normA = normalizeTitle(a);
+  const normB = normalizeTitle(b);
+  if (!normA || !normB) return true;
+  return normA === normB || normA.includes(normB) || normB.includes(normA);
+}
 
 export async function fetchTrendingShows(): Promise<TMDBShow[]> {
   const apiKey = getTMDBApiKey();
@@ -222,18 +235,45 @@ export async function searchTMDB(query: string): Promise<TMDBShow[]> {
   );
 }
 
-export async function fetchShowDetails(showId: number): Promise<TMDBShow | null> {
-  if (showDetailsCache.has(showId)) {
-    return showDetailsCache.get(showId)!;
+export async function fetchShowDetails(
+  showId: number,
+  expectedTitle?: string
+): Promise<TMDBShow | null> {
+  const resolvedId = showIdAliasMap.get(showId) || showId;
+
+  if (showDetailsCache.has(resolvedId)) {
+    const cached = showDetailsCache.get(resolvedId)!;
+    if (!expectedTitle || titlesMatch(cached.name, expectedTitle)) {
+      return cached;
+    }
   }
 
   const apiKey = getTMDBApiKey();
   if (apiKey) {
     try {
-      const res = await fetch(`${TMDB_BASE_URL}/tv/${showId}?api_key=${apiKey}&language=en-US`);
+      const res = await fetch(`${TMDB_BASE_URL}/tv/${resolvedId}?api_key=${apiKey}&language=en-US`);
       if (res.ok) {
         const data: TMDBShow = await res.json();
-        showDetailsCache.set(showId, data);
+
+        // Detect ID collision (e.g. TVMaze ID 64992 = "The Gentlemen" vs TMDB ID 64992 = "Man vs. Weird")
+        if (expectedTitle && !titlesMatch(data.name, expectedTitle)) {
+          console.warn(
+            `TMDB ID ${resolvedId} returned "${data.name}" which does not match expected "${expectedTitle}". Resolving real TMDB entry...`
+          );
+          const searchResults = await searchTMDB(expectedTitle);
+          const bestMatch =
+            searchResults.find((s) => titlesMatch(s.name, expectedTitle)) || searchResults[0];
+
+          if (bestMatch && titlesMatch(bestMatch.name, expectedTitle)) {
+            showIdAliasMap.set(showId, bestMatch.id);
+            showDetailsCache.set(showId, bestMatch);
+            showDetailsCache.set(bestMatch.id, bestMatch);
+            return bestMatch;
+          }
+        }
+
+        showDetailsCache.set(resolvedId, data);
+        if (showId !== resolvedId) showDetailsCache.set(showId, data);
         return data;
       }
     } catch (err) {
@@ -247,6 +287,19 @@ export async function fetchShowDetails(showId: number): Promise<TMDBShow | null>
     if (res.ok) {
       const data: TVMazeShowItem = await res.json();
       const mapped = mapTVMazeToShow(data);
+
+      // If TMDB API key is active, resolve TMDB equivalent for better posters and metadata
+      if (apiKey && mapped.name) {
+        const tmdbResults = await searchTMDB(mapped.name);
+        const bestTmdb = tmdbResults.find((s) => titlesMatch(s.name, mapped.name));
+        if (bestTmdb) {
+          showIdAliasMap.set(showId, bestTmdb.id);
+          showDetailsCache.set(showId, bestTmdb);
+          showDetailsCache.set(bestTmdb.id, bestTmdb);
+          return bestTmdb;
+        }
+      }
+
       showDetailsCache.set(showId, mapped);
 
       // Pre-populate seasonDetailsCache from embedded episodes
@@ -293,9 +346,18 @@ export async function fetchShowDetails(showId: number): Promise<TMDBShow | null>
 
 export async function fetchSeasonDetails(
   showId: number,
-  seasonNumber: number
+  seasonNumber: number,
+  expectedTitle?: string
 ): Promise<TMDBSeasonDetail | null> {
-  const cacheKey = `${showId}-${seasonNumber}`;
+  let resolvedId = showIdAliasMap.get(showId) || showId;
+  if (resolvedId === showId && expectedTitle) {
+    const cachedShow = showDetailsCache.get(showId);
+    if (cachedShow && cachedShow.id !== showId) {
+      resolvedId = cachedShow.id;
+    }
+  }
+
+  const cacheKey = `${resolvedId}-${seasonNumber}`;
   if (seasonDetailsCache.has(cacheKey)) {
     return seasonDetailsCache.get(cacheKey)!;
   }
@@ -304,11 +366,12 @@ export async function fetchSeasonDetails(
   if (apiKey) {
     try {
       const res = await fetch(
-        `${TMDB_BASE_URL}/tv/${showId}/season/${seasonNumber}?api_key=${apiKey}&language=en-US`
+        `${TMDB_BASE_URL}/tv/${resolvedId}/season/${seasonNumber}?api_key=${apiKey}&language=en-US`
       );
       if (res.ok) {
         const data: TMDBSeasonDetail = await res.json();
         seasonDetailsCache.set(cacheKey, data);
+        if (showId !== resolvedId) seasonDetailsCache.set(`${showId}-${seasonNumber}`, data);
         return data;
       }
     } catch (err) {
@@ -316,7 +379,7 @@ export async function fetchSeasonDetails(
     }
   }
 
-  // Fetch from TVMaze episodes
+  // Fetch from TVMaze episodes using original showId
   try {
     const res = await fetch(`${TVMAZE_BASE_URL}/shows/${showId}/episodes`);
     if (res.ok) {
@@ -362,8 +425,9 @@ export async function fetchSeasonDetails(
     console.warn('TVMaze fetch season episodes failed:', err);
   }
 
-  if (MOCK_SEASON_EPISODES[cacheKey]) {
-    return MOCK_SEASON_EPISODES[cacheKey];
+  const mockKey = `${showId}-${seasonNumber}`;
+  if (MOCK_SEASON_EPISODES[mockKey]) {
+    return MOCK_SEASON_EPISODES[mockKey];
   }
 
   // Default fallback generator if offline
