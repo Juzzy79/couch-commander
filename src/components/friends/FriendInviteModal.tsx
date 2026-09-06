@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Users, Check, X, LogIn, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Users, Check, X, LogIn, Sparkles, Mail, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 import { fetchUserProfileFromFirestore, createMutualFriendship } from '../../lib/firestoreService';
 import { ConfettiBurst } from '../common/ConfettiBurst';
@@ -10,12 +10,19 @@ export const FriendInviteModal: React.FC = () => {
   const user = useAuthStore((state) => state.user);
   const isGuest = useAuthStore((state) => state.isGuest);
   const openAuthModal = useAuthStore((state) => state.openAuthModal);
+  const signInWithGoogle = useAuthStore((state) => state.signInWithGoogle);
+  const loginAsGuest = useAuthStore((state) => state.loginAsGuest);
   const updateUser = useAuthStore((state) => state.updateUser);
+  const authLoading = useAuthStore((state) => state.isLoading);
+  const authError = useAuthStore((state) => state.authError);
+  const clearAuthError = useAuthStore((state) => state.clearAuthError);
 
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [inviter, setInviter] = useState<UserProfile | null>(null);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [autoAcceptOnAuth, setAutoAcceptOnAuth] = useState<boolean>(false);
+  const hasAutoAcceptedRef = useRef<boolean>(false);
 
   useEffect(() => {
     // Check URL parameters for ?invite= or ?friend=
@@ -82,21 +89,63 @@ export const FriendInviteModal: React.FC = () => {
     setIsConnecting(true);
     triggerHaptic('medium');
 
-    const success = await createMutualFriendship(user.userId, inviter.userId);
-    if (success) {
-      // Add inviter to current user's friends list
-      const currentFriends = user.friends || [];
-      if (!currentFriends.includes(inviter.userId)) {
-        updateUser({ friends: [...currentFriends, inviter.userId] });
-      }
-      setIsConnected(true);
-      localStorage.removeItem('couch_commander_pending_invite');
-      triggerHaptic('success');
-      setTimeout(() => {
-        setIsOpen(false);
-      }, 2200);
+    // Instantly add to local user friends for responsive feedback
+    const currentFriends = user.friends || [];
+    if (!currentFriends.includes(inviter.userId)) {
+      updateUser({ friends: [...currentFriends, inviter.userId] });
     }
+
+    setIsConnected(true);
+    localStorage.removeItem('couch_commander_pending_invite');
+    triggerHaptic('success');
+
+    try {
+      await createMutualFriendship(user.userId, inviter.userId);
+    } catch (e) {
+      console.warn('Could not sync mutual friendship in background:', e);
+    }
+
+    setTimeout(() => {
+      setIsOpen(false);
+    }, 2200);
     setIsConnecting(false);
+  };
+
+  // Auto-connect once user signs in if they initiated sign in from this invite
+  useEffect(() => {
+    if (
+      user &&
+      inviter &&
+      isOpen &&
+      !isConnected &&
+      !isConnecting &&
+      autoAcceptOnAuth &&
+      !hasAutoAcceptedRef.current
+    ) {
+      hasAutoAcceptedRef.current = true;
+      handleAcceptInvite();
+    }
+  }, [user, inviter, isOpen, autoAcceptOnAuth, isConnected, isConnecting]);
+
+  const handleGoogleConnect = async () => {
+    clearAuthError();
+    setAutoAcceptOnAuth(true);
+    triggerHaptic('medium');
+    await signInWithGoogle();
+  };
+
+  const handleEmailConnect = () => {
+    clearAuthError();
+    setAutoAcceptOnAuth(true);
+    triggerHaptic('light');
+    openAuthModal();
+  };
+
+  const handleGuestConnect = () => {
+    clearAuthError();
+    setAutoAcceptOnAuth(true);
+    triggerHaptic('light');
+    loginAsGuest();
   };
 
   const handleDismiss = () => {
@@ -166,16 +215,21 @@ export const FriendInviteModal: React.FC = () => {
                 <button
                   onClick={handleAcceptInvite}
                   disabled={isConnecting}
-                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-black font-black text-sm shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-black font-black text-sm shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer"
                 >
-                  <Users className="w-4 h-4" />
+                  {isConnecting ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-black" />
+                  ) : (
+                    <Users className="w-4 h-4" />
+                  )}
                   <span>{isConnecting ? 'Connecting...' : 'Accept & Add to Friends'}</span>
                 </button>
 
                 {isGuest && (
                   <button
-                    onClick={openAuthModal}
-                    className="w-full py-2.5 px-4 rounded-2xl bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors"
+                    onClick={handleGoogleConnect}
+                    disabled={authLoading}
+                    className="w-full py-2.5 px-4 rounded-2xl bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <LogIn className="w-3.5 h-3.5" />
                     <span>Sign In with Google to Save Permanently</span>
@@ -184,17 +238,62 @@ export const FriendInviteModal: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-2.5">
+                {/* Error Banner if any */}
+                {authError && (
+                  <div className="p-2.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-[11px] text-rose-300 flex items-center gap-2 text-left">
+                    <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                    <span className="flex-1 leading-tight">{authError}</span>
+                  </div>
+                )}
+
+                {/* Primary: 1-Tap Google Sign In */}
                 <button
-                  onClick={openAuthModal}
-                  className="w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-black font-black text-sm shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  onClick={handleGoogleConnect}
+                  disabled={authLoading}
+                  className="w-full py-3.5 px-4 rounded-2xl bg-white hover:bg-slate-100 text-slate-900 font-black text-sm shadow-xl shadow-black/40 flex items-center justify-center gap-2.5 active:scale-95 transition-all cursor-pointer disabled:opacity-60"
                 >
-                  <LogIn className="w-4 h-4" />
-                  <span>Sign In to Connect</span>
+                  {authLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-slate-900" />
+                  ) : (
+                    <svg className="w-4 h-4" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                  )}
+                  <span>{authLoading ? 'Signing in...' : 'Sign In with Google to Connect'}</span>
                 </button>
 
-                <p className="text-[10px] text-emerald-500">
-                  Takes 5 seconds with Google or Email.
-                </p>
+                {/* Secondary: Email Sign In Modal */}
+                <button
+                  onClick={handleEmailConnect}
+                  disabled={authLoading}
+                  className="w-full py-2.5 px-4 rounded-2xl bg-emerald-950/80 hover:bg-emerald-900/80 border border-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Sign In with Email / Password</span>
+                </button>
+
+                {/* Tertiary: Guest connect */}
+                <button
+                  onClick={handleGuestConnect}
+                  className="w-full py-1.5 text-[11px] text-emerald-400/80 hover:text-emerald-300 transition-colors cursor-pointer"
+                >
+                  Or continue as Guest
+                </button>
               </div>
             )}
           </div>

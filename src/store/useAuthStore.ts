@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import {
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
@@ -69,6 +71,47 @@ export const useAuthStore = create<AuthState>((set, get) => {
     clearAuthError: () => set({ authError: null }),
 
     initializeAuthListener: () => {
+      // Check for redirect result when returning from redirect auth on mobile
+      getRedirectResult(auth)
+        .then(async (result) => {
+          if (result?.user) {
+            const fbUser = result.user;
+            const remoteProfile = await fetchUserProfileFromFirestore(fbUser.uid);
+            const userProfile: UserProfile = remoteProfile || {
+              userId: fbUser.uid,
+              username: (fbUser.displayName || fbUser.email?.split('@')[0] || 'watcher')
+                .toLowerCase()
+                .replace(/[^a-z0-9]/g, '_'),
+              displayName: fbUser.displayName || 'Couch Commander',
+              avatarUrl: fbUser.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${fbUser.uid}`,
+              bio: 'Tracking my favorite TV shows 📺',
+              dailyStreak: 0,
+              lastCheckInDate: '',
+              badges: [],
+              friends: [],
+              createdAt: Date.now(),
+            };
+
+            if (!remoteProfile) {
+              await saveUserProfileToFirestore(userProfile);
+            }
+
+            set({
+              user: userProfile,
+              firebaseUser: fbUser,
+              isAuthenticated: true,
+              isGuest: false,
+              isLoading: false,
+              isAuthModalOpen: false,
+            });
+
+            localStorage.setItem('couch_commander_user', JSON.stringify(userProfile));
+          }
+        })
+        .catch((err) => {
+          console.warn('Redirect auth result info:', err);
+        });
+
       const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
         if (fbUser) {
           set({ isLoading: true });
@@ -121,8 +164,21 @@ export const useAuthStore = create<AuthState>((set, get) => {
     signInWithGoogle: async () => {
       set({ isLoading: true, authError: null });
       try {
-        const result = await signInWithPopup(auth, googleProvider);
-        const fbUser = result.user;
+        let fbUser: FirebaseUser;
+        try {
+          const result = await signInWithPopup(auth, googleProvider);
+          fbUser = result.user;
+        } catch (popupErr: any) {
+          // If popup is blocked by mobile Safari / in-app browsers, fall back to redirect
+          if (
+            popupErr?.code === 'auth/popup-blocked' ||
+            popupErr?.code === 'auth/cancelled-popup-request'
+          ) {
+            await signInWithRedirect(auth, googleProvider);
+            return;
+          }
+          throw popupErr;
+        }
 
         const remoteProfile = await fetchUserProfileFromFirestore(fbUser.uid);
         const userProfile: UserProfile = remoteProfile || {

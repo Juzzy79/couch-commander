@@ -191,9 +191,6 @@ export const AppContent: React.FC = () => {
       {/* Global Badge Unlock Celebratory Modal */}
       <BadgeUnlockModal />
 
-      {/* Auth Modal (Google & Email/Password Sign-in) */}
-      <AuthModal />
-
       {/* Settings Modal */}
       <SettingsModal />
 
@@ -207,6 +204,9 @@ export const AppContent: React.FC = () => {
           onClose={() => setSelectedShowForModal(null)}
         />
       )}
+
+      {/* Auth Modal (Google & Email/Password Sign-in) - Topmost overlay */}
+      <AuthModal />
     </div>
   );
 };
