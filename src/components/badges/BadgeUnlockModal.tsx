@@ -24,7 +24,10 @@ export const BadgeUnlockModal: React.FC = () => {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+      <div
+        style={{ zIndex: 15000 }}
+        className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md"
+      >
         <ConfettiBurst trigger={true} />
 
         <motion.div

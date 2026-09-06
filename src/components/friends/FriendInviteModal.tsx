@@ -156,7 +156,10 @@ export const FriendInviteModal: React.FC = () => {
   if (!isOpen || !inviter) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
+    <div
+      style={{ zIndex: 8000 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in"
+    >
       {isConnected && <ConfettiBurst trigger={true} />}
 
       <div className="w-full max-w-sm rounded-3xl bg-gradient-to-b from-[#0c2f1f] via-[#061910] to-[#040f09] border border-emerald-500/40 p-6 shadow-2xl relative overflow-hidden text-center">

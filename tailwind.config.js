@@ -53,6 +53,14 @@ export default {
           '0%, 100%': { transform: 'translateY(0)', filter: 'drop-shadow(0 0 12px rgba(16, 185, 129, 0.6))' },
           '50%': { transform: 'translateY(-4px)', filter: 'drop-shadow(0 0 20px rgba(16, 185, 129, 0.9))' },
         }
+      },
+      zIndex: {
+        '50': '50',
+        '60': '60',
+        '70': '70',
+        '80': '80',
+        '90': '90',
+        '100': '100',
       }
     },
   },

@@ -120,7 +120,10 @@ export const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show: initialS
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden">
+      <div
+        style={{ zIndex: 500 }}
+        className="fixed inset-0 z-[50] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden"
+      >
         <motion.div
           initial={{ y: '100%' }}
           animate={{ y: 0 }}
