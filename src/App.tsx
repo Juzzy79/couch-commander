@@ -214,17 +214,6 @@ export const AppContent: React.FC = () => {
       {/* Fixed Bottom Navigation */}
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* Quick Check-In Selector Modal */}
-      <CheckInSelectorModal
-        onOpenShowDetails={(show) => setSelectedShowForModal(show)}
-      />
-
-      {/* Global Check-in Bottom Sheet */}
-      <CheckInBottomSheet />
-
-      {/* Global Badge Unlock Celebratory Modal */}
-      <BadgeUnlockModal />
-
       {/* Settings Modal */}
       <SettingsModal />
 
@@ -238,6 +227,17 @@ export const AppContent: React.FC = () => {
           onClose={() => setSelectedShowForModal(null)}
         />
       )}
+
+      {/* Quick Check-In Selector Modal */}
+      <CheckInSelectorModal
+        onOpenShowDetails={(show) => setSelectedShowForModal(show)}
+      />
+
+      {/* Global Check-in Bottom Sheet (Overlays ShowDetailModal directly) */}
+      <CheckInBottomSheet />
+
+      {/* Global Badge Unlock Celebratory Modal */}
+      <BadgeUnlockModal />
 
       {/* Auth Modal (Google & Email/Password Sign-in) - Topmost overlay */}
       <AuthModal />

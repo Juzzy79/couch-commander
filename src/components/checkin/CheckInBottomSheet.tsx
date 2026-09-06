@@ -37,7 +37,7 @@ export const CheckInBottomSheet: React.FC = () => {
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-md">
+      <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/80 backdrop-blur-md">
         {/* Backdrop dismiss */}
         <div
           onClick={closeCheckInModal}

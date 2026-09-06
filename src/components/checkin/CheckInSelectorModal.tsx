@@ -77,7 +77,7 @@ export const CheckInSelectorModal: React.FC<CheckInSelectorModalProps> = ({ onOp
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-md">
+      <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/80 backdrop-blur-md">
         <div onClick={closeQuickSelector} className="absolute inset-0 bg-transparent" />
 
         <motion.div
