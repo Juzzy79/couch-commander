@@ -15,7 +15,7 @@ import { SettingsModal } from './components/settings/SettingsModal';
 import { ShowDetailModal } from './components/search/ShowDetailModal';
 import { AuthModal } from './components/auth/AuthModal';
 import { FriendInviteModal } from './components/friends/FriendInviteModal';
-import { fetchShowDetails } from './lib/tmdb';
+import { fetchShowDetails, calculateNextEpisodeOrCompletion } from './lib/tmdb';
 import { useAuthStore } from './store/useAuthStore';
 import { useCheckInStore } from './store/useCheckInStore';
 import { useTrackerStore } from './store/useTrackerStore';
@@ -99,6 +99,17 @@ export const AppContent: React.FC = () => {
 
       const totalWatched = Math.max(existing?.totalEpisodesWatched || 0, uniqueWatchedCount);
 
+      // Don't downgrade completed or plan_to_watch shows automatically unless user actively checked in recently
+      const finalStatus = existing?.status === 'completed' && (!latestCheckIn || latestCheckIn.timestamp < (existing.lastWatchedAt || 0))
+        ? 'completed'
+        : (existing?.status === 'plan_to_watch' && showCheckIns.length === 0 ? 'plan_to_watch' : 'watching');
+
+      const initialNextEp = {
+        seasonNumber: latestCheckIn.seasonNumber || 1,
+        episodeNumber: (latestCheckIn.episodeNumber || 1) + 1,
+        title: `Episode ${(latestCheckIn.episodeNumber || 1) + 1}`,
+      };
+
       useTrackerStore.getState().addOrUpdateShow({
         tmdbShowId: effectiveShowId,
         showTitle: latestCheckIn.showTitle,
@@ -110,16 +121,37 @@ export const AppContent: React.FC = () => {
           effectiveShowId === 236235
             ? '/yG1wltFmkX5c5ocACKfpX0tp3SY.jpg'
             : existing?.backdropPath,
-        status: 'watching',
+        status: finalStatus,
         currentSeason: latestCheckIn.seasonNumber || 1,
         currentEpisode: latestCheckIn.episodeNumber || 1,
         totalEpisodesWatched: totalWatched,
         totalEpisodesInShow: existing?.totalEpisodesInShow || 8,
-        nextEpisodeToWatch: {
-          seasonNumber: latestCheckIn.seasonNumber || 1,
-          episodeNumber: (latestCheckIn.episodeNumber || 1) + 1,
-          title: `Episode ${(latestCheckIn.episodeNumber || 1) + 1}`,
-        },
+        nextEpisodeToWatch: finalStatus === 'completed' ? undefined : (existing?.nextEpisodeToWatch || initialNextEp),
+      });
+
+      // Query TMDB/TVMaze metadata asynchronously to check if the show is finished
+      calculateNextEpisodeOrCompletion(
+        effectiveShowId,
+        latestCheckIn.seasonNumber || 1,
+        latestCheckIn.episodeNumber || 1,
+        latestCheckIn.showTitle
+      ).then((res) => {
+        const currentNow = useTrackerStore.getState().getTrackedShow(effectiveShowId);
+        if (!currentNow) return;
+
+        // If user already marked it completed or status changed, respect it
+        if (res.isCompleted) {
+          useTrackerStore.getState().addOrUpdateShow({
+            ...currentNow,
+            status: 'completed',
+            nextEpisodeToWatch: undefined,
+          });
+        } else if (res.nextEpisode && currentNow.status !== 'completed') {
+          useTrackerStore.getState().addOrUpdateShow({
+            ...currentNow,
+            nextEpisodeToWatch: res.nextEpisode,
+          });
+        }
       });
     });
   };

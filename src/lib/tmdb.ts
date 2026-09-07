@@ -452,3 +452,100 @@ export async function fetchSeasonDetails(
     })),
   };
 }
+
+export interface NextEpisodeResult {
+  isCompleted: boolean;
+  nextEpisode?: {
+    seasonNumber: number;
+    episodeNumber: number;
+    title: string;
+    overview?: string;
+    stillPath?: string;
+    airDate?: string;
+  };
+}
+
+/**
+ * Accurately determines the next episode to watch or whether the show is completed.
+ * Inspects the current season's episodes and show's total seasons.
+ */
+export async function calculateNextEpisodeOrCompletion(
+  showId: number,
+  currentSeason: number,
+  currentEpisode: number,
+  expectedTitle?: string
+): Promise<NextEpisodeResult> {
+  try {
+    const show = await fetchShowDetails(showId, expectedTitle);
+    const seasonDetail = await fetchSeasonDetails(showId, currentSeason, expectedTitle);
+
+    const episodesInCurrentSeason = seasonDetail?.episodes || [];
+    const maxEpInCurrentSeason = episodesInCurrentSeason.length > 0
+      ? Math.max(...episodesInCurrentSeason.map((e) => e.episode_number))
+      : 0;
+
+    // 1. If there are more episodes in the current season
+    if (maxEpInCurrentSeason > 0 && currentEpisode < maxEpInCurrentSeason) {
+      const nextEpData = episodesInCurrentSeason.find(
+        (e) => e.episode_number === currentEpisode + 1
+      );
+      return {
+        isCompleted: false,
+        nextEpisode: {
+          seasonNumber: currentSeason,
+          episodeNumber: currentEpisode + 1,
+          title: nextEpData?.name || `Episode ${currentEpisode + 1}`,
+          overview: nextEpData?.overview,
+          stillPath: nextEpData?.still_path || undefined,
+          airDate: nextEpData?.air_date || undefined,
+        },
+      };
+    }
+
+    // 2. If we finished the current season, check if there is a next season
+    const validSeasons = show?.seasons?.filter((s) => s.season_number > 0) || [];
+    const nextSeasonSummary = validSeasons.find(
+      (s) => s.season_number === currentSeason + 1
+    );
+
+    if (nextSeasonSummary) {
+      // Check if next season has episodes
+      const nextSeasonDetail = await fetchSeasonDetails(
+        showId,
+        currentSeason + 1,
+        expectedTitle
+      );
+      if (nextSeasonDetail?.episodes && nextSeasonDetail.episodes.length > 0) {
+        const firstEp = nextSeasonDetail.episodes[0];
+        return {
+          isCompleted: false,
+          nextEpisode: {
+            seasonNumber: currentSeason + 1,
+            episodeNumber: firstEp.episode_number || 1,
+            title: firstEp.name || `Season ${currentSeason + 1} Premiere`,
+            overview: firstEp.overview,
+            stillPath: firstEp.still_path || undefined,
+            airDate: firstEp.air_date || undefined,
+          },
+        };
+      }
+    }
+
+    // 3. No further episodes or seasons exist -> Show is Completed!
+    return {
+      isCompleted: true,
+    };
+  } catch (err) {
+    console.warn('Error calculating next episode:', err);
+    // Fallback if check fails
+    return {
+      isCompleted: false,
+      nextEpisode: {
+        seasonNumber: currentSeason,
+        episodeNumber: currentEpisode + 1,
+        title: `Episode ${currentEpisode + 1}`,
+      },
+    };
+  }
+}
+

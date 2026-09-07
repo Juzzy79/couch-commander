@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { TrackedShow, ShowStatus } from '../types';
-import { saveTrackedShowToFirestore } from '../lib/firestoreService';
+import { saveTrackedShowToFirestore, deleteTrackedShowFromFirestore } from '../lib/firestoreService';
 import { useAuthStore } from './useAuthStore';
 
 interface TrackerState {
@@ -194,6 +194,10 @@ export const useTrackerStore = create<TrackerState>((set, get) => {
       const updated = shows.filter((s) => s.tmdbShowId !== showId);
       set({ trackedShows: updated });
       persist(updated);
+      const user = useAuthStore.getState().user;
+      if (user && user.userId) {
+        deleteTrackedShowFromFirestore(user.userId, showId);
+      }
     },
   };
 });

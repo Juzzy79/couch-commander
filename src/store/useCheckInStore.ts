@@ -4,6 +4,7 @@ import { useAuthStore } from './useAuthStore';
 import { useTrackerStore } from './useTrackerStore';
 import { useBadgeStore } from './useBadgeStore';
 import { triggerHaptic } from '../lib/haptics';
+import { calculateNextEpisodeOrCompletion } from '../lib/tmdb';
 import {
   publishCheckInToFirestore,
   saveShowStatsToFirestore,
@@ -140,20 +141,48 @@ export const useCheckInStore = create<CheckInState>((set, get) => {
       const existingShow = tracker.getTrackedShow(target.tmdbShowId);
       const currentEpisodesCount = existingShow?.totalEpisodesWatched || 0;
 
+      const isLastInSeason = target.totalEpisodesInSeason && target.episodeNumber >= target.totalEpisodesInSeason;
+
       tracker.addOrUpdateShow({
         tmdbShowId: target.tmdbShowId,
         showTitle: target.showTitle,
         posterPath: target.posterPath || (existingShow?.posterPath || ''),
-        status: 'watching',
+        status: target.isSeriesFinale ? 'completed' : 'watching',
         currentSeason: target.seasonNumber,
         currentEpisode: target.episodeNumber,
         totalEpisodesWatched: currentEpisodesCount + 1,
         totalEpisodesInShow: target.totalEpisodesInSeason || (existingShow?.totalEpisodesInShow || 10),
-        nextEpisodeToWatch: {
-          seasonNumber: target.seasonNumber,
-          episodeNumber: target.episodeNumber + 1,
-          title: `Episode ${target.episodeNumber + 1}`,
-        },
+        nextEpisodeToWatch: target.isSeriesFinale
+          ? undefined
+          : {
+              seasonNumber: isLastInSeason ? target.seasonNumber + 1 : target.seasonNumber,
+              episodeNumber: isLastInSeason ? 1 : target.episodeNumber + 1,
+              title: isLastInSeason ? `Season ${target.seasonNumber + 1} Premiere` : `Episode ${target.episodeNumber + 1}`,
+            },
+      });
+
+      // Query database for accurate next episode or complete status
+      calculateNextEpisodeOrCompletion(
+        target.tmdbShowId,
+        target.seasonNumber,
+        target.episodeNumber,
+        target.showTitle
+      ).then((res) => {
+        const currentNow = useTrackerStore.getState().getTrackedShow(target.tmdbShowId);
+        if (!currentNow) return;
+
+        if (res.isCompleted) {
+          useTrackerStore.getState().addOrUpdateShow({
+            ...currentNow,
+            status: 'completed',
+            nextEpisodeToWatch: undefined,
+          });
+        } else if (res.nextEpisode && currentNow.status !== 'completed') {
+          useTrackerStore.getState().addOrUpdateShow({
+            ...currentNow,
+            nextEpisodeToWatch: res.nextEpisode,
+          });
+        }
       });
 
       auth.incrementStreak();
@@ -260,21 +289,48 @@ export const useCheckInStore = create<CheckInState>((set, get) => {
       // 4. Update Tracker pointer - automatically add to watching & Up Next
       const existingShow = useTrackerStore.getState().getTrackedShow(target.tmdbShowId);
       const currentEpisodesCount = existingShow?.totalEpisodesWatched || 0;
+      const isLastInSeason = target.totalEpisodesInSeason && target.episodeNumber >= target.totalEpisodesInSeason;
 
       useTrackerStore.getState().addOrUpdateShow({
         tmdbShowId: target.tmdbShowId,
         showTitle: target.showTitle,
         posterPath: target.posterPath || (existingShow?.posterPath || ''),
-        status: 'watching',
+        status: target.isSeriesFinale ? 'completed' : 'watching',
         currentSeason: target.seasonNumber,
         currentEpisode: target.episodeNumber,
         totalEpisodesWatched: currentEpisodesCount + 1,
         totalEpisodesInShow: target.totalEpisodesInSeason || (existingShow?.totalEpisodesInShow || 10),
-        nextEpisodeToWatch: {
-          seasonNumber: target.seasonNumber,
-          episodeNumber: target.episodeNumber + 1,
-          title: `Episode ${target.episodeNumber + 1}`,
-        },
+        nextEpisodeToWatch: target.isSeriesFinale
+          ? undefined
+          : {
+              seasonNumber: isLastInSeason ? target.seasonNumber + 1 : target.seasonNumber,
+              episodeNumber: isLastInSeason ? 1 : target.episodeNumber + 1,
+              title: isLastInSeason ? `Season ${target.seasonNumber + 1} Premiere` : `Episode ${target.episodeNumber + 1}`,
+            },
+      });
+
+      // Query database for accurate next episode or complete status
+      calculateNextEpisodeOrCompletion(
+        target.tmdbShowId,
+        target.seasonNumber,
+        target.episodeNumber,
+        target.showTitle
+      ).then((res) => {
+        const currentNow = useTrackerStore.getState().getTrackedShow(target.tmdbShowId);
+        if (!currentNow) return;
+
+        if (res.isCompleted) {
+          useTrackerStore.getState().addOrUpdateShow({
+            ...currentNow,
+            status: 'completed',
+            nextEpisodeToWatch: undefined,
+          });
+        } else if (res.nextEpisode && currentNow.status !== 'completed') {
+          useTrackerStore.getState().addOrUpdateShow({
+            ...currentNow,
+            nextEpisodeToWatch: res.nextEpisode,
+          });
+        }
       });
 
       // 5. Update Streak

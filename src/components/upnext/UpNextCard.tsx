@@ -1,9 +1,10 @@
 import React from 'react';
-import { Check, MessageSquarePlus, Crown, Tv, ChevronRight } from 'lucide-react';
+import { Check, MessageSquarePlus, Crown, Tv, ChevronRight, CheckCircle2, RotateCcw } from 'lucide-react';
 import { TrackedShow } from '../../types';
 import { GlassCard } from '../common/GlassCard';
 import { getTMDBImageUrl } from '../../lib/utils';
 import { useCheckInStore } from '../../store/useCheckInStore';
+import { useTrackerStore } from '../../store/useTrackerStore';
 import { useAuthStore } from '../../store/useAuthStore';
 
 interface UpNextCardProps {
@@ -25,6 +26,29 @@ export const UpNextCard: React.FC<UpNextCardProps> = ({ show, onOpenDetails }) =
 
   const isCommander = showStats?.couchCommander?.userId === currentUserId;
   const userCount = (currentUserId && showStats?.userCheckInCounts?.[currentUserId]) || 0;
+
+  const addOrUpdateShow = useTrackerStore((state) => state.addOrUpdateShow);
+
+  const isCompleted = show.status === 'completed';
+
+  const handleRestartWatching = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    addOrUpdateShow({
+      tmdbShowId: show.tmdbShowId,
+      showTitle: show.showTitle,
+      posterPath: show.posterPath,
+      backdropPath: show.backdropPath,
+      status: 'watching',
+      currentSeason: 1,
+      currentEpisode: 0,
+      totalEpisodesInShow: show.totalEpisodesInShow || 10,
+      nextEpisodeToWatch: {
+        seasonNumber: 1,
+        episodeNumber: 1,
+        title: 'Episode 1',
+      },
+    });
+  };
 
   const handleCheckInClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -103,28 +127,54 @@ export const UpNextCard: React.FC<UpNextCardProps> = ({ show, onOpenDetails }) =
         </div>
       </div>
 
-      {/* Queued Next Episode Details */}
-      <div className="bg-[#05130d]/90 border border-emerald-900/60 rounded-xl p-3 mb-3.5">
-        <div className="flex items-center justify-between text-xs mb-1">
-          <div className="flex items-center gap-1.5 font-bold text-emerald-400">
-            <Tv className="w-3.5 h-3.5" />
-            <span>Up Next: S{nextEp.seasonNumber}E{nextEp.episodeNumber}</span>
+      {/* Queued Next Episode or Completed Banner */}
+      {isCompleted ? (
+        <div className="bg-[#051a13]/90 border border-teal-700/60 rounded-xl p-3 mb-3.5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-teal-500/20 text-teal-400">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-teal-300 uppercase tracking-wider">
+                Show Completed
+              </h4>
+              <p className="text-[11px] text-teal-200/70">
+                You've watched all available episodes!
+              </p>
+            </div>
           </div>
-          {nextEp.airDate && (
-            <span className="text-[10px] text-emerald-400/70">{nextEp.airDate}</span>
+          <button
+            onClick={handleRestartWatching}
+            className="flex items-center gap-1.5 py-1.5 px-3 rounded-lg bg-[#0e2a1d] hover:bg-[#153e2a] border border-emerald-700/70 text-emerald-300 text-xs font-bold transition-all active:scale-95"
+            title="Start from beginning"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Rewatch</span>
+          </button>
+        </div>
+      ) : (
+        <div className="bg-[#05130d]/90 border border-emerald-900/60 rounded-xl p-3 mb-3.5">
+          <div className="flex items-center justify-between text-xs mb-1">
+            <div className="flex items-center gap-1.5 font-bold text-emerald-400">
+              <Tv className="w-3.5 h-3.5" />
+              <span>Up Next: S{nextEp.seasonNumber}E{nextEp.episodeNumber}</span>
+            </div>
+            {nextEp.airDate && (
+              <span className="text-[10px] text-emerald-400/70">{nextEp.airDate}</span>
+            )}
+          </div>
+          
+          <h4 className="text-sm font-semibold text-zinc-100 line-clamp-1">
+            {nextEp.title}
+          </h4>
+
+          {nextEp.overview && (
+            <p className="text-xs text-emerald-300/70 line-clamp-2 mt-1 leading-relaxed">
+              {nextEp.overview}
+            </p>
           )}
         </div>
-        
-        <h4 className="text-sm font-semibold text-zinc-100 line-clamp-1">
-          {nextEp.title}
-        </h4>
-
-        {nextEp.overview && (
-          <p className="text-xs text-emerald-300/70 line-clamp-2 mt-1 leading-relaxed">
-            {nextEp.overview}
-          </p>
-        )}
-      </div>
+      )}
 
       {/* Progress Bar with Emerald to Teal Gradient */}
       <div className="w-full bg-emerald-950/80 rounded-full h-1.5 mb-3.5 overflow-hidden">
@@ -135,23 +185,43 @@ export const UpNextCard: React.FC<UpNextCardProps> = ({ show, onOpenDetails }) =
       </div>
 
       {/* Action Buttons */}
-      <div className="grid grid-cols-2 gap-2.5">
-        <button
-          onClick={handleQuickWatch}
-          className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-[#0e2a1d] hover:bg-[#153e2a] border border-emerald-800/70 text-emerald-200 text-xs font-bold transition-all active:scale-95"
-        >
-          <Check className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Quick Watched</span>
-        </button>
+      {isCompleted ? (
+        <div className="grid grid-cols-2 gap-2.5">
+          <button
+            onClick={handleRestartWatching}
+            className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-[#0e2a1d] hover:bg-[#153e2a] border border-emerald-800/70 text-emerald-200 text-xs font-bold transition-all active:scale-95"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Watch Again</span>
+          </button>
 
-        <button
-          onClick={handleCheckInClick}
-          className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-black text-xs font-black shadow-md shadow-emerald-500/25 transition-all active:scale-95"
-        >
-          <MessageSquarePlus className="w-3.5 h-3.5" />
-          <span>Check In Live</span>
-        </button>
-      </div>
+          <button
+            onClick={() => onOpenDetails(show)}
+            className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-black shadow-md shadow-teal-500/25 transition-all active:scale-95"
+          >
+            <Tv className="w-3.5 h-3.5" />
+            <span>View Show</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2.5">
+          <button
+            onClick={handleQuickWatch}
+            className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-[#0e2a1d] hover:bg-[#153e2a] border border-emerald-800/70 text-emerald-200 text-xs font-bold transition-all active:scale-95"
+          >
+            <Check className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Quick Watched</span>
+          </button>
+
+          <button
+            onClick={handleCheckInClick}
+            className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-black text-xs font-black shadow-md shadow-emerald-500/25 transition-all active:scale-95"
+          >
+            <MessageSquarePlus className="w-3.5 h-3.5" />
+            <span>Check In Live</span>
+          </button>
+        </div>
+      )}
     </GlassCard>
   );
 };

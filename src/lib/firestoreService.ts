@@ -8,6 +8,7 @@ import {
   query,
   where,
   getDocs,
+  deleteDoc,
   arrayUnion,
   orderBy,
   limit,
@@ -84,6 +85,21 @@ export async function saveTrackedShowToFirestore(
     await setDoc(showRef, show, { merge: true });
   } catch (err) {
     console.warn('Could not save tracked show to Firestore:', err);
+  }
+}
+
+/**
+ * Remove a single tracked show for the user from Firestore
+ */
+export async function deleteTrackedShowFromFirestore(
+  userId: string,
+  showId: number
+): Promise<void> {
+  try {
+    const showRef = doc(db, 'users', userId, 'trackedShows', String(showId));
+    await deleteDoc(showRef);
+  } catch (err) {
+    console.warn('Could not delete tracked show from Firestore:', err);
   }
 }
 

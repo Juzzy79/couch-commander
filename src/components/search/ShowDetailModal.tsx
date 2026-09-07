@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Star, Plus, Check, Play, Tv } from 'lucide-react';
+import { X, Star, Plus, Check, Play, Tv, CheckCircle2, RotateCcw } from 'lucide-react';
 import { TMDBShow, TMDBSeasonDetail } from '../../types/tmdb';
 import { getTMDBImageUrl } from '../../lib/utils';
-import { fetchSeasonDetails, fetchShowDetails } from '../../lib/tmdb';
+import { fetchSeasonDetails, fetchShowDetails, calculateNextEpisodeOrCompletion } from '../../lib/tmdb';
 import { useTrackerStore } from '../../store/useTrackerStore';
 import { useCheckInStore } from '../../store/useCheckInStore';
 import { ShowLeaderboard } from '../leaderboard/ShowLeaderboard';
@@ -36,6 +36,7 @@ export const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show: initialS
   const addOrUpdateShow = useTrackerStore((state) => state.addOrUpdateShow);
   const markSeasonWatched = useTrackerStore((state) => state.markSeasonWatched);
   const markEpisodeWatched = useTrackerStore((state) => state.markEpisodeWatched);
+  const updateShowStatus = useTrackerStore((state) => state.updateShowStatus);
   const openCheckInModal = useCheckInStore((state) => state.openCheckInModal);
   const getShowStats = useCheckInStore((state) => state.getShowStats);
 
@@ -92,13 +93,77 @@ export const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show: initialS
     });
   };
 
+  const handleMarkCompleted = () => {
+    triggerHaptic('success');
+    updateShowStatus(show.id, 'completed');
+    // Clear next episode pointer when marked completed
+    const existing = useTrackerStore.getState().getTrackedShow(show.id);
+    if (existing) {
+      addOrUpdateShow({
+        ...existing,
+        status: 'completed',
+        nextEpisodeToWatch: undefined,
+      });
+    }
+  };
+
+  const handleRestartWatching = () => {
+    triggerHaptic('success');
+    addOrUpdateShow({
+      tmdbShowId: show.id,
+      showTitle: show.name,
+      posterPath: show.poster_path || '',
+      backdropPath: show.backdrop_path || '',
+      status: 'watching',
+      currentSeason: 1,
+      currentEpisode: 0,
+      totalEpisodesInShow: show.number_of_episodes || 10,
+      nextEpisodeToWatch: {
+        seasonNumber: 1,
+        episodeNumber: 1,
+        title: 'Episode 1',
+      },
+    });
+  };
+
   const handleMarkSeasonWatched = () => {
     triggerHaptic('success');
     const epCount = seasonDetail?.episodes.length || 10;
     markSeasonWatched(show.id, selectedSeasonNumber, epCount);
+
+    // Check if there is another season, or if this was the last season
+    calculateNextEpisodeOrCompletion(
+      show.id,
+      selectedSeasonNumber,
+      epCount,
+      show.name
+    ).then((res) => {
+      const currentNow = useTrackerStore.getState().getTrackedShow(show.id);
+      if (!currentNow) return;
+
+      if (res.isCompleted) {
+        addOrUpdateShow({
+          ...currentNow,
+          status: 'completed',
+          nextEpisodeToWatch: undefined,
+        });
+      } else if (res.nextEpisode) {
+        addOrUpdateShow({
+          ...currentNow,
+          nextEpisodeToWatch: res.nextEpisode,
+        });
+      }
+    });
   };
 
   const handleCheckInEpisode = (ep: { episode_number: number; name: string }) => {
+    const isLastInSeason = seasonDetail?.episodes
+      ? ep.episode_number === seasonDetail.episodes.length
+      : false;
+    const isLastSeason = show.number_of_seasons
+      ? selectedSeasonNumber === show.number_of_seasons
+      : true;
+
     openCheckInModal({
       tmdbShowId: show.id,
       showTitle: show.name,
@@ -106,16 +171,41 @@ export const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show: initialS
       seasonNumber: selectedSeasonNumber,
       episodeNumber: ep.episode_number,
       episodeTitle: ep.name,
+      totalEpisodesInSeason: seasonDetail?.episodes?.length,
       isSeriesFinale:
-        show.status === 'Ended' &&
-        selectedSeasonNumber === (show.number_of_seasons || 1) &&
-        ep.episode_number === (seasonDetail?.episodes.length || 1),
+        (show.status === 'Ended' || show.status === 'Canceled') &&
+        isLastSeason &&
+        isLastInSeason,
     });
   };
 
   const handleQuickWatchEpisode = (ep: { episode_number: number }) => {
     triggerHaptic('light');
     markEpisodeWatched(show.id, selectedSeasonNumber, ep.episode_number);
+
+    // Accurately verify next episode or completion
+    calculateNextEpisodeOrCompletion(
+      show.id,
+      selectedSeasonNumber,
+      ep.episode_number,
+      show.name
+    ).then((res) => {
+      const currentNow = useTrackerStore.getState().getTrackedShow(show.id);
+      if (!currentNow) return;
+
+      if (res.isCompleted) {
+        addOrUpdateShow({
+          ...currentNow,
+          status: 'completed',
+          nextEpisodeToWatch: undefined,
+        });
+      } else if (res.nextEpisode) {
+        addOrUpdateShow({
+          ...currentNow,
+          nextEpisodeToWatch: res.nextEpisode,
+        });
+      }
+    });
   };
 
   return (
@@ -174,12 +264,36 @@ export const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show: initialS
 
           <div className="p-4 space-y-5 flex-1">
             {/* Action Bar */}
-            <div className="flex items-center gap-2">
-              {trackedShow?.status === 'watching' ? (
-                <div className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-black">
-                  <Check className="w-4 h-4" />
-                  <span>Currently Watching</span>
-                </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {trackedShow?.status === 'completed' ? (
+                <>
+                  <div className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-teal-500/20 border border-teal-500/40 text-teal-300 text-xs font-black">
+                    <CheckCircle2 className="w-4 h-4 text-teal-400" />
+                    <span>Completed</span>
+                  </div>
+                  <button
+                    onClick={handleRestartWatching}
+                    className="py-2.5 px-3.5 rounded-xl bg-[#091e14] hover:bg-[#0f2e1f] border border-emerald-800/80 text-emerald-300 text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5"
+                    title="Watch again from Episode 1"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Watch Again</span>
+                  </button>
+                </>
+              ) : trackedShow?.status === 'watching' ? (
+                <>
+                  <div className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-black">
+                    <Check className="w-4 h-4" />
+                    <span>Currently Watching</span>
+                  </div>
+                  <button
+                    onClick={handleMarkCompleted}
+                    className="py-2.5 px-3.5 rounded-xl bg-[#0a2318] hover:bg-[#103323] border border-teal-600/60 text-teal-300 text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
+                    <span>Mark Complete</span>
+                  </button>
+                </>
               ) : (
                 <button
                   onClick={handleStartWatching}
@@ -190,7 +304,7 @@ export const ShowDetailModal: React.FC<ShowDetailModalProps> = ({ show: initialS
                 </button>
               )}
 
-              {trackedShow?.status !== 'plan_to_watch' && (
+              {trackedShow?.status !== 'plan_to_watch' && trackedShow?.status !== 'completed' && (
                 <button
                   onClick={handlePlanToWatch}
                   className="py-2.5 px-3.5 rounded-xl bg-[#091e14] hover:bg-[#0f2e1f] border border-emerald-850 text-emerald-300 text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5"
